@@ -3,7 +3,7 @@ const ICE={iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun.cl
 export class P2PRoom{
   constructor(role){
     if(!window.Peer) throw new Error("PeerJS could not load. Check your internet connection and reload the page.");
-    this.role=role; this.peer=null; this.conn=null; this.call=null; this.handlers={message:[],state:[],error:[],stream:[]};
+    this.role=role; this.peer=null; this.conn=null; this.call=null; this.pendingCall=null; this.outgoingCall=null; this.handlers={message:[],state:[],error:[],stream:[]};
   }
   on(type,fn){(this.handlers[type]??=[]).push(fn);return this}
   emit(type,data){for(const fn of this.handlers[type]??[])try{fn(data)}catch(e){console.error(e)}}
@@ -48,18 +48,24 @@ export class P2PRoom{
     conn.on("error",e=>this.emit("error",normalizePeerError(e)));
   }
   send(data){if(!this.conn||!this.conn.open)throw new Error("Player is not connected yet.");this.conn.send(data)}
-  async startCameraCall(stream){
+  startCameraCall(stream){
     if(!this.peer||!this.conn?.peer)throw new Error("Peer connection is not ready.");
+    if(this.outgoingCall && !this.outgoingCall.open)return this.outgoingCall;
     const call=this.peer.call(this.conn.peer,stream,{metadata:{kind:"cubeclash-camera"}});
-    this.attachCall(call); return call;
+    this.outgoingCall=call;
+    this.attachCall(call);
+    return call;
   }
-  async handleIncomingCall(call){
-    this.call=call; this.emit("state","camera-requested");
-    // The app calls answerWithCamera() after the user grants camera permission.
+  handleIncomingCall(call){
+    this.pendingCall=call;
+    this.emit("state","camera-requested");
   }
   answerWithCamera(stream){
-    if(!this.call)throw new Error("No incoming camera request.");
-    this.call.answer(stream); this.attachCall(this.call); this.call=null;
+    if(!this.pendingCall)throw new Error("No incoming camera request.");
+    const call=this.pendingCall;
+    this.pendingCall=null;
+    call.answer(stream);
+    this.attachCall(call);
   }
   attachCall(call){
     this.call=call;

@@ -39,11 +39,11 @@ function navigateMatchWindow(){
   try{s.matchWindow.location.href="./match.html?role="+encodeURIComponent(s.role||"");s.matchWindow.focus();return true}catch(e){return false}
 }
 function exposeMatchBridge(){
-  window.CubeClashBridge={get state(){return {role:s.role,roomCode:s.roomCode||"",scramble:s.scramble||"",match:s.match||null,opponent:s.opponent||{time:"0.00",status:"WAITING"},phase:s.matchPhase||"ready",theme:localStorage.getItem("cubeclash-theme")||"dark"}},get localStream(){return s.localStream||null},get remoteStream(){return s.remoteStream||null}};
+  window.CubeClashBridge={get state(){return {role:s.role,roomCode:s.roomCode||"",scramble:s.scramble||"",puzzle:s.puzzle||"333",match:s.match||null,opponent:s.opponent||{time:"0.00",status:"WAITING"},phase:s.matchPhase||"ready",theme:localStorage.getItem("cubeclash-theme")||"dark"}},get localStream(){return s.localStream||null},get remoteStream(){return s.remoteStream||null}};
 }
 exposeMatchBridge();
 function room(){
-  v(`<div class="room-page"><div class="section-title"><h1>1V1 ROOM</h1><small>LIVE WEBRTC / PEER-TO-PEER</small></div><div class="room-layout"><div class="room-card"><h2>CREATE ROOM</h2><p class="room-help">Create a room and share the short room code. You can open the match window after your opponent connects.</p><div class="form-grid"><div class="field"><label>PUZZLE</label><select id="rp"><option value="333">3×3</option><option value="222">2×2</option></select></div><div class="field"><label>ROUNDS</label><select id="rr"><option>3</option><option selected>5</option><option>7</option></select></div><div class="field"><label>INSPECTION</label><select id="ri"><option>15</option><option>10</option><option>0</option></select></div><div class="field"><label>FORMAT</label><select id="rf"><option>FIRST TO</option><option>BEST OF</option></select></div></div><div class="checks"><label class="check"><input id="rp2" type="checkbox" checked> +2</label><label class="check"><input id="rdnf" type="checkbox" checked> DNF</label></div><button class="primary-btn" id="create">CREATE ROOM</button><div id="hostRoom" class="room-code-box" hidden></div></div><div class="room-card"><h2>JOIN ROOM</h2><p class="room-help">Enter the room code shown by Player 1. No offer/answer strings are needed.</p><div class="field"><label>ROOM CODE</label><input id="roomCode" class="code-input" autocomplete="off" autocapitalize="characters" placeholder="e.g. A7K9P2QX"></div><button class="primary-btn" id="join">JOIN ROOM</button></div></div><div id="rs" class="empty">NO ACTIVE ROOM</div></div>`);
+  v(`<div class="room-page"><div class="section-title"><h1>1V1 ROOM</h1><small>LIVE WEBRTC / PEER-TO-PEER</small></div><div class="room-layout"><div class="room-card"><h2>CREATE ROOM</h2><p class="room-help">Create a room and share the short room code. The match window opens after both players connect.</p><div class="form-grid"><div class="field"><label>PUZZLE</label><select id="rp"><option value="333">3×3</option><option value="222">2×2</option></select></div><div class="field"><label>ROUNDS</label><select id="rr"><option>3</option><option selected>5</option><option>7</option></select></div><div class="field"><label>INSPECTION</label><select id="ri"><option>15</option><option>10</option><option>0</option></select></div><div class="field"><label>FORMAT</label><select id="rf"><option>FIRST TO</option><option>BEST OF</option></select></div></div><div class="checks"><label class="check"><input id="rp2" type="checkbox" checked> +2</label><label class="check"><input id="rdnf" type="checkbox" checked> DNF</label></div><button class="primary-btn" id="create">CREATE ROOM</button><div id="hostRoom" class="room-code-box" hidden></div></div><div class="room-card"><h2>JOIN ROOM</h2><p class="room-help">Enter the room code shown by Player 1. No offer/answer strings are needed.</p><div class="field"><label>ROOM CODE</label><input id="roomCode" class="code-input" autocomplete="off" autocapitalize="characters" placeholder="e.g. A7K9P2QX"></div><button class="primary-btn" id="join">JOIN ROOM</button></div></div><div id="rs" class="empty">NO ACTIVE ROOM</div></div>`);
   document.querySelector("#create").onclick=createRoom;
   document.querySelector("#join").onclick=joinRoom;
 }
@@ -55,7 +55,6 @@ function showRoomStatus(title,body="",kind=""){
 }
 function makeRoomCode(id){return id.slice(-8).toUpperCase()}
 async function createRoom(){
-  preopenMatchWindow();
   try{
     s.role="host";
     s.puzzle=document.querySelector("#rp").value;
@@ -73,7 +72,6 @@ async function createRoom(){
   }catch(err){console.error(err);showRoomStatus("ROOM CREATION FAILED",err.message||String(err),"error");toast("CREATE ROOM FAILED")}
 }
 async function joinRoom(){
-  preopenMatchWindow();
   try{
     const code=(document.querySelector("#roomCode")?.value||"").trim();
     if(!code)throw new Error("Enter the room code first.");
@@ -82,7 +80,7 @@ async function joinRoom(){
     wireRoom();
     showRoomStatus("CONNECTING",`Looking for room ${code.toUpperCase()}…`);
     const ok=await s.room.joinRoom(code);
-    if(ok){showRoomStatus("CONNECTED","Waiting for the host to send the match setup…");appendRoomWindowButton();toast("PLAYER 1 CONNECTED")}
+    if(ok){showRoomStatus("CONNECTED","Both players are connected. Allow the camera, then open the match window.");toast("PLAYER 1 CONNECTED")}
   }catch(err){console.error(err);showRoomStatus("JOIN FAILED",err.message||String(err),"error");toast("JOIN FAILED")}
 }
 function appendRoomWindowButton(){
@@ -104,22 +102,24 @@ function wireRoom(){
         try{s.room.send(config)}catch(e){console.error(e)}
       }
       showCameraPermission();
-      setTimeout(()=>navigateMatchWindow(),120);
+      // The match window is opened from a deliberate user action after connection.
+      appendConnectedMatchButton();
     }
     if(state==="closed")showRoomStatus("PLAYER DISCONNECTED","The peer connection closed.","error");
     if(state==="signaling-disconnected")showRoomStatus("SIGNALING DISCONNECTED","The room service connection was lost. Existing P2P connections may continue.","error");
   }).on("state",state=>{
-    if(state==="camera-requested"&&s.localStream&&s.role==="guest"){try{s.room.answerWithCamera(s.localStream)}catch(e){console.error(e)}}
+    if(state==="camera-requested"&&s.localStream){try{s.room.answerWithCamera(s.localStream)}catch(e){console.error(e)}}
   }).on("message",msg=>{
     if(!msg||typeof msg!=="object")return;
     if(msg.type==="match-config"&&s.role==="guest"){
       s.match=msg.match;s.puzzle=msg.match.puzzle;s.scramble=msg.scramble||randomScramble();
       renderMatch();
+      setTimeout(()=>showCameraPermission(),0);
       toast("MATCH READY");
     }
-    if(msg.type==="camera-ready"){s.remoteCameraReady=true;}
-    if(msg.type==="camera-ready"&&s.role==="host"&&s.localStream){
-      if(!s.cameraCallStarted){s.cameraCallStarted=true;s.room.startCameraCall(s.localStream).catch(e=>console.error(e))}
+    if(msg.type==="camera-ready"){
+      s.remoteCameraReady=true;
+      if(s.localStream){try{s.room.startCameraCall(s.localStream)}catch(e){console.error(e)}}
     }
     if(msg.type==="timer-start")setOpponentState("SOLVING",msg.startedAt);
     if(msg.type==="timer-inspection")setOpponentState("INSPECTION",msg.startedAt);
@@ -160,22 +160,38 @@ async function sendCameraReady(){
 async function showCameraPermission(){
   renderMatch(true);
   const modal=document.querySelector("#cameraModal");if(!modal)return;
-  if(s.localStream){
-    modal.hidden=true;
-    updateCameraState("CAMERA READY");
-    await sendCameraReady();
-    return;
-  }
   modal.hidden=false;
-  document.querySelector("#allowCamera").onclick=async()=>{
-    const stream=await requestCamera();
-    if(!stream){updateCameraState("CAMERA BLOCKED — ALLOW CAMERA IN BROWSER SETTINGS");toast("CAMERA PERMISSION DENIED");return}
-    modal.hidden=true;
-    updateCameraState("CAMERA READY");
-    await sendCameraReady();
+  const allow=document.querySelector("#allowCamera");
+  const skip=document.querySelector("#skipCamera");
+  allow.onclick=async()=>{
+    try{
+      if(!navigator.mediaDevices?.getUserMedia)throw new Error("Camera access is not supported by this browser.");
+      s.localStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},audio:false});
+      const local=document.querySelector("#localVideo");
+      if(local){local.srcObject=s.localStream;local.play().catch(()=>{});}
+      modal.hidden=true;
+      updateCameraState("CAMERA READY");
+      if(s.room?.pendingCall){try{s.room.answerWithCamera(s.localStream)}catch(e){console.error(e)}}
+      exposeMatchBridge();
+      try{s.room.send({type:"camera-ready"})}catch(e){console.error(e)}
+      if(s.remoteCameraReady){try{s.room.startCameraCall(s.localStream)}catch(e){console.error(e)}}
+      openMatchWindow();
+    }catch(err){
+      console.error("Camera permission error",err);
+      updateCameraState("CAMERA BLOCKED — CHECK BROWSER PERMISSIONS");
+      toast(err?.name==="NotAllowedError"?"CAMERA PERMISSION DENIED":"CAMERA UNAVAILABLE");
+    }
   };
-  document.querySelector("#skipCamera").onclick=()=>{modal.hidden=true;updateCameraState("CAMERA OFF")};
+  skip.onclick=()=>{modal.hidden=true;updateCameraState("CAMERA OFF");try{s.room?.send({type:"camera-skipped"})}catch{};openMatchWindow()};
 }
+function appendConnectedMatchButton(){
+  const e=document.querySelector("#rs");if(!e||document.querySelector("#openConnectedMatch"))return;
+  const row=document.createElement("div");row.className="room-actions";
+  row.innerHTML='<button class="primary-btn" id="openConnectedMatch">OPEN MATCH WINDOW</button>';
+  e.appendChild(row);
+  document.querySelector("#openConnectedMatch").onclick=()=>openMatchWindow();
+}
+
 function renderMatch(preconnect=false){
   v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?"PLAYER 1 / HOST":"PLAYER 2 / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${s.match?.round||1}</span><span id="matchScore">${s.match?.score?.[0]||0} — ${s.match?.score?.[1]||0}</span><button class="ghost-btn" data-view="home">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">CAMERA WAITING</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?"PLAYER 1":"PLAYER 2"}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div class="match-controls"><button class="primary-btn" id="matchStart">START</button><button class="ghost-btn" id="matchDone">FINISH</button></div></div><div class="center-match"><div class="center-scramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div><div class="center-cube">${cube()}</div><div class="match-controls"><span class="match-connection" id="matchConnection">${preconnect?"CONNECTING":"CONNECTED"}</span></div></div><div class="player-card"><div class="player-name">${s.role==="host"?"PLAYER 2":"PLAYER 1"}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA</div><h2>ALLOW CAMERA</h2><p>Both players are connected. Allow CubeClash to use your camera for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA</button></div></div></div></div>`);
   mountCube();
