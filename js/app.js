@@ -73,7 +73,7 @@ function wireRoom(){
       }else{
         try{s.room.send({type:"player-name",name:settings.name||"PLAYER 2"})}catch(e){console.error(e)}
       }
-      showCameraPermission();
+      setTimeout(()=>showCameraPermission(),120);
     }
     if(state==="camera-requested"&&s.localStream){try{s.room.answerWithMedia(s.localStream)}catch(e){console.error(e)}}
     if(state==="closed")showRoomStatus("PLAYER DISCONNECTED","The peer connection closed.","error");
@@ -94,10 +94,15 @@ function wireRoom(){
       if(s.localStream){try{s.room.startMediaCall(s.localStream)}catch(e){console.error(e)}}
     }
     if(msg.type==="camera-skipped"){s.remoteMediaReady=false;updateMatchUI()}
-    if(msg.type==="timer-inspection")setOpponentState("INSPECTION",msg.startedAt);
-    if(msg.type==="timer-start")setOpponentState("SOLVING",msg.startedAt);
+    if(msg.type==="timer-inspection")setOpponentState("INSPECTION",msg.startedAt,msg.round);
+    if(msg.type==="timer-start")setOpponentState("SOLVING",msg.startedAt,msg.round);
+    if(msg.type==="timer-tick"){
+      if(msg.round===s.match?.round && (msg.status==="INSPECTION"||msg.status==="SOLVING")){
+        s.opponent.status=msg.status; s.opponent.startedAt=msg.startedAt||s.opponent.startedAt; s.opponent.inspection=msg.inspection??(s.match?.inspection||15); s.opponent.round=msg.round; s.opponent.time=msg.time||s.opponent.time||"0.00"; updateMatchUI();
+      }
+    }
     if(msg.type==="timer-finish"){
-      s.opponent.status=msg.display||"FINISHED"; s.opponent.time=msg.display||"—"; s.opponent.result=msg.display||"—"; updateMatchUI();
+      s.opponent.status="FINISHED"; s.opponent.time=msg.display||"—"; s.opponent.result=msg.display||"—"; s.opponent.finishedAt=Date.now(); updateMatchUI();
       if(msg.round===s.match?.round)s.remoteRoundResult=msg.display||"DNF";
       maybeResolveRound();
     }
@@ -111,13 +116,14 @@ function wireRoom(){
       s.match.status="FINISHED"; s.match.winner=msg.winner||"DRAW"; updateMatchUI();
     }
   }).on("stream",stream=>{
-    s.remoteStream=stream; const v=document.querySelector("#remoteVideo"); if(v){v.srcObject=stream;v.play().catch(()=>{})} updateCameraState("OPPONENT MEDIA CONNECTED");
+    s.remoteStream=stream; const v=document.querySelector("#remoteVideo"); if(v){v.srcObject=stream; v.autoplay=true; v.playsInline=true; v.play().catch(()=>{document.querySelector("#remoteVideo")?.setAttribute("controls","true")})} const note=document.querySelector("#remoteCamState"); if(note)note.textContent="OPPONENT CAMERA + MIC CONNECTED";
   }).on("error",err=>{console.error("CubeClash P2P error",err);toast(err.message||String(err));});
 }
 async function showCameraPermission(){
   if(!s.room)return;
   renderMatch(true);
   const modal=document.querySelector("#cameraModal"); if(!modal)return; modal.hidden=false;
+  document.querySelector("#matchConnection")?.replaceChildren(document.createTextNode("CONNECTED"));
   const allow=document.querySelector("#allowCamera"),skip=document.querySelector("#skipCamera");
   allow.onclick=async()=>{
     try{
@@ -205,28 +211,66 @@ function bindMatchTimer(){
 }
 
 function updateCameraState(text){const e=document.querySelector("#localCamState");if(e)e.textContent=text}
-function setOpponentState(status,time){s.opponent.status=status;if(time)s.opponent.startedAt=time;updateMatchUI()}
+function setOpponentState(status,time,round){
+  s.opponent.status=status;
+  if(time)s.opponent.startedAt=time;
+  s.opponent.round=round||s.match?.round||1;
+  s.opponent.inspection=s.match?.inspection||15;
+  if(status==="INSPECTION"||status==="SOLVING")startOpponentLoop();
+  updateMatchUI();
+}
+function startOpponentLoop(){
+  cancelAnimationFrame(s.opponentRaf);
+  const tick=()=>{
+    if(!s.opponent.startedAt || (s.opponent.round||1)!==(s.match?.round||1))return;
+    const elapsed=Math.max(0,Date.now()-s.opponent.startedAt);
+    let ms=0;
+    if(s.opponent.status==="INSPECTION") ms=Math.max(0,(s.opponent.inspection||15)*1000-elapsed);
+    else if(s.opponent.status==="SOLVING") ms=elapsed;
+    else return;
+    s.opponent.time=fmt(ms);
+    const t=document.querySelector("#oppTimer"); if(t)t.textContent=s.opponent.time;
+    s.opponentRaf=requestAnimationFrame(tick);
+  };
+  tick();
+}
 function updateMatchUI(){
   const t=document.querySelector("#oppTimer"),st=document.querySelector("#oppState"),sc=document.querySelector("#matchScore"),r=document.querySelector("#matchRound"),mt=document.querySelector("#matchMainTimer"),ml=document.querySelector("#matchMainLabel");
   if(t)t.textContent=s.opponent.time||"0.00"; if(st)st.textContent=s.opponent.status||"WAITING"; if(sc)sc.textContent=`${s.match?.score?.[0]||0} — ${s.match?.score?.[1]||0}`; if(r)r.textContent=`ROUND ${s.match?.round||1} / ${s.match?.rounds||1}`;
   if(mt&&s.matchPhase==="ready")mt.textContent="0.00"; if(ml)ml.textContent=s.matchPhase==="inspection"?"INSPECTION":s.matchPhase==="solving"?"SOLVING":s.matchPhase==="finished"?"FINISHED":"READY";
-  const nr=document.querySelector("#nextRound"); if(nr)nr.hidden=!(s.roundResult&&s.match?.round<(s.match?.rounds||1));
+  const nr=document.querySelector("#nextRound");
+  const bothFinished=!!s.myRoundResult&&!!s.remoteRoundResult;
+  if(nr){const allowed=bothFinished&&!!s.roundResult&&s.match?.round<(s.match?.rounds||1);nr.hidden=!allowed;nr.disabled=!allowed;}
 }
 function matchInspection(){
   if(s.matchPhase&&s.matchPhase!=="ready"&&s.matchPhase!=="finished")return;
-  s.matchPhase="inspection"; s.matchPenalty=""; s.matchInspectionStart=performance.now();
-  try{s.room?.send({type:"timer-inspection",startedAt:Date.now(),round:s.match?.round||1})}catch{}
-  matchLoop(); updateMatchUI();
+  s.matchPhase="inspection"; s.matchPenalty=""; s.matchInspectionStart=performance.now(); s.matchInspectionStartedAt=Date.now();
+  try{s.room?.send({type:"timer-inspection",startedAt:Date.now(),round:s.match?.round||1,inspection:s.match?.inspection||15})}catch{}
+  matchLoop(); updateMatchUI(); sendMatchTimerTick();
 }
 function matchStart(){
   if(s.matchPhase!=="inspection")return;
   const elapsed=performance.now()-s.matchInspectionStart; s.matchPenalty=elapsed>=17000?"DNF":elapsed>=15000?"+2":"";
-  s.matchPhase="solving"; s.matchSolveStart=performance.now();
-  try{s.room?.send({type:"timer-start",startedAt:Date.now(),round:s.match?.round||1})}catch{}
-  matchLoop(); updateMatchUI();
+  s.matchPhase="solving"; s.matchSolveStart=performance.now(); s.matchSolveStartedAt=Date.now();
+  try{s.room?.send({type:"timer-start",startedAt:Date.now(),round:s.match?.round||1,inspection:s.match?.inspection||15})}catch{}
+  matchLoop(); updateMatchUI(); sendMatchTimerTick();
 }
 function matchToggle(){if(s.matchPhase==="ready"||s.matchPhase==="finished")matchInspection();else if(s.matchPhase==="inspection")matchStart();else if(s.matchPhase==="solving")matchFinish()}
-function matchLoop(){cancelAnimationFrame(s.matchRaf);const tick=()=>{const now=performance.now();if(s.matchPhase==="inspection"){const ms=Math.max(0,(s.match?.inspection||15)*1000-(now-s.matchInspectionStart));setMatchTimer(ms,"INSPECTION");}else if(s.matchPhase==="solving"){setMatchTimer(now-s.matchSolveStart,"SOLVING");}else{return} s.matchRaf=requestAnimationFrame(tick)};tick()}
+function matchLoop(){cancelAnimationFrame(s.matchRaf);const tick=()=>{const now=performance.now();if(s.matchPhase==="inspection"){const ms=Math.max(0,(s.match?.inspection||15)*1000-(now-s.matchInspectionStart));setMatchTimer(ms,"INSPECTION");}else if(s.matchPhase==="solving"){setMatchTimer(now-s.matchSolveStart,"SOLVING");}else{return} sendMatchTimerTick(); s.matchRaf=requestAnimationFrame(tick)};tick()}
+function sendMatchTimerTick(){
+  if(!s.room||!s.matchPhase)return;
+  const now=performance.now();
+  if(s._lastMatchTick&&now-s._lastMatchTick<100)return;
+  s._lastMatchTick=now;
+  const round=s.match?.round||1;
+  if(s.matchPhase==="inspection"){
+    const ms=Math.max(0,(s.match?.inspection||15)*1000-(performance.now()-s.matchInspectionStart));
+    try{s.room.send({type:"timer-tick",status:"INSPECTION",startedAt:s.matchInspectionStartedAt||Date.now(),inspection:s.match?.inspection||15,round,time:fmt(ms)})}catch{}
+  }else if(s.matchPhase==="solving"){
+    const ms=Math.max(0,performance.now()-s.matchSolveStart);
+    try{s.room.send({type:"timer-tick",status:"SOLVING",startedAt:s.matchSolveStartedAt||Date.now(),inspection:s.match?.inspection||15,round,time:fmt(ms)})}catch{}
+  }
+}
 function setMatchTimer(ms,label){const a=document.querySelector("#matchMainTimer");if(a)a.textContent=fmt(ms);const b=document.querySelector("#matchMainLabel");if(b)b.textContent=label;const c=document.querySelector("#myTimer");if(c)c.textContent=fmt(ms)}
 function matchFinish(){
   if(s.matchPhase!=="solving")return; cancelAnimationFrame(s.matchRaf); const ms=performance.now()-s.matchSolveStart; s.matchPhase="finished";
@@ -251,7 +295,7 @@ function nextRound(){
   s.match.round++; s.match.status="PLAYING"; s.scramble=randomScramble(); s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.opponent={time:"0.00",status:"WAITING"};
   try{s.room.send({type:"next-round",round:s.match.round,score:s.match.score,scramble:s.scramble})}catch{} resetMatchRound();
 }
-function resetMatchRound(){s.matchPhase="ready";s.matchPenalty="";cancelAnimationFrame(s.matchRaf);renderMatch(false)}
+function resetMatchRound(){s.matchPhase="ready";s.matchPenalty="";cancelAnimationFrame(s.matchRaf);cancelAnimationFrame(s.opponentRaf);s.opponent={time:"0.00",status:"WAITING"};s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;renderMatch(false)}
 function settingsView(){v(`<div class="section-title"><h1>SETTINGS</h1><small>LOCAL DEVICE</small></div><div class="settings-grid"><div class="setting-card"><h2>APPEARANCE</h2><div class="theme-options" style="margin-top:14px"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div></div><div class="setting-card"><h2>PROFILE</h2><div class="field"><label>DISPLAY NAME</label><input id="displayName" maxlength="24" value="${esc(settings.name||"")}" placeholder="YOUR NAME" autocomplete="nickname"></div><p style="color:#666;font-size:12px;line-height:1.6">Your name is shown to the other player during 1v1 matches.</p></div><div class="setting-card"><h2>TIMER</h2><div class="field"><label>INSPECTION SECONDS</label><select id="ins"><option ${settings.inspection===0?"selected":""}>0</option><option ${settings.inspection===10?"selected":""}>10</option><option ${settings.inspection===15?"selected":""}>15</option></select></div><div class="room-actions"><button class="primary-btn" id="save">SAVE SETTINGS</button></div></div><div class="setting-card"><h2>DATA</h2><p style="color:#666;font-size:12px;line-height:1.6">Solves are stored locally in IndexedDB. Export your times before clearing browser data or moving to another device.</p><div class="room-actions"><button class="ghost-btn" id="ex">EXPORT JSON</button><label class="ghost-btn" style="display:grid;place-items:center;cursor:pointer">IMPORT JSON<input id="im" type="file" accept=".json" hidden></label><button class="danger-btn" id="cl">CLEAR SOLVES</button></div></div><div class="setting-card wipe-card"><h2>RESET / UPDATE</h2><p style="color:#666;font-size:12px;line-height:1.6">Use this when a new CubeClash update is installed and the old service worker or cached files are causing problems. CubeClash will automatically download a JSON backup of your solve history first, then clear local app data, caches, and the service worker.</p><div class="room-actions"><button class="danger-btn" id="wipeAll">EXPORT + WIPE APP DATA</button></div></div></div>`);bindTheme();applyTheme(localStorage.getItem("cubeclash-theme")||"dark");document.querySelector("#save").onclick=()=>{settings.inspection=+document.querySelector("#ins").value;settings.name=(document.querySelector("#displayName")?.value||"").trim().slice(0,24);localStorage.setItem("cubeclash-settings",JSON.stringify(settings));toast("SETTINGS SAVED")};document.querySelector("#ex").onclick=async()=>{const b=new Blob([JSON.stringify(await exportData(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`cubeclash-${Date.now()}.json`;a.click()};document.querySelector("#im").onchange=async e=>{try{await importData(JSON.parse(await e.target.files[0].text()));toast("DATA IMPORTED")}catch{toast("IMPORT FAILED")}};document.querySelector("#cl").onclick=async()=>{if(confirm("Clear all local solves? This cannot be undone unless you exported them.")){await clearSolves();toast("SOLVES CLEARED")}};document.querySelector("#wipeAll").onclick=async()=>{if(!confirm("CubeClash will export your solve history and then clear local app data, cache, settings, and service worker. Continue?"))return;try{await wipeCubeClashData({downloadBackup:true});alert("Backup downloaded. CubeClash will reload with a clean installation.");location.reload()}catch(e){console.error(e);toast("RESET FAILED")}}}
 async function nav(x){if(x==="home")home();if(x==="solo")await solo();if(x==="room")room();if(x==="settings")settingsView()}document.addEventListener("click",e=>{const x=e.target.closest("[data-view]");if(x)nav(x.dataset.view)});window.addEventListener("online",()=>{document.querySelector("#networkText").textContent="ONLINE"});window.addEventListener("offline",()=>{document.querySelector("#networkText").textContent="OFFLINE"});window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;document.querySelector("#installBtn").hidden=false});document.querySelector("#installBtn").onclick=async()=>{if(deferredInstall){await deferredInstall.prompt();deferredInstall=null}};if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("./service-worker.js");
 if(localStorage.getItem("cubeclash-tutorial-seen")==="1")home();else tutorial();
