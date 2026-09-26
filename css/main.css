@@ -74,3 +74,14 @@ body.theme-light .video-card{background:#ddd}body.theme-light .video-label,body.
 body.theme-light .match-page .video-card{background:#ddd}body.theme-light .match-page .video-card video{background:#ddd}
 body:not(.theme-light) .match-page .video-card video{background:#000}
 @media(max-width:760px){.scramble-net{width:min(290px,100%);gap:3px}.facelet{border-radius:1px}.net-label{font-size:5px}.match-timer-zone{touch-action:none;-webkit-user-select:none;user-select:none}}
+
+/* v15 multiplayer fixes */
+.match-page .scramble-net{display:grid!important;visibility:visible!important;min-height:160px;background:transparent;position:relative}
+.match-page .net-face{min-height:0;visibility:visible}
+.match-page .match-timer-zone{background:var(--panel)!important;color:var(--text)!important}
+body.theme-light .match-page .match-timer-zone{background:#fff!important;color:#090909!important}
+body:not(.theme-light) .match-page .match-timer-zone{background:#050505!important;color:#fff!important}
+body:not(.theme-light) .match-page .match-main-timer{color:#fff!important}
+body.theme-light .match-page .match-main-timer{color:#090909!important}
+.match-page .match-timer-zone:focus{outline:2px solid var(--text);outline-offset:-2px}
+@media(min-width:761px){.match-page .scramble-net{width:min(430px,100%);min-height:190px}}
