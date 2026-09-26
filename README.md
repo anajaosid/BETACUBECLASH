@@ -33,3 +33,11 @@ PeerJS provides the signaling service needed to discover the other browser; the 
 ## 3D scramble viewer
 
 The v6 local 3D cube renderer is intentionally retained. It does not depend on the TwistyPlayer CDN and builds the visible cube from the generated scramble state.
+
+## Reset after an update
+
+Open **Settings → Export + Wipe App Data** when an update appears stuck on an older cached version. CubeClash downloads a JSON backup of the local solve history first, then clears IndexedDB, local settings, Cache Storage, and the service worker before reloading.
+
+## Multiplayer match window
+
+After a host creates a room or a guest joins, CubeClash opens a separate same-origin match tab. The main CubeClash tab owns the PeerJS/WebRTC connection and camera streams; the match tab mirrors the local and opponent video, scramble, and match state. If the browser blocks the new tab, use **OPEN MATCH WINDOW** from the room status before entering the match.

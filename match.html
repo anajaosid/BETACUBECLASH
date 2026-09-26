@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#050505"><title>CubeClash Match</title><link rel="stylesheet" href="css/main.css"></head>
+<body class="match-window-body"><main id="matchWindowApp"><div class="match-window-loading">WAITING FOR MATCH CONNECTION…</div></main>
+<script>
+(function(){
+  const app=document.getElementById('matchWindowApp');
+  function esc(x){return String(x??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+  function render(){
+    const bridge=window.opener&&window.opener.CubeClashBridge;
+    if(!bridge){app.innerHTML='<div class="match-window-loading">OPEN THIS MATCH WINDOW FROM CUBECLASH.</div>';return;}
+    const st=bridge.state;
+    document.documentElement.style.colorScheme=st.theme==='light'?'light':'dark';
+    document.body.classList.toggle('theme-light',st.theme==='light');
+    app.innerHTML=`<div class="match-window"><header class="match-window-head"><div><strong>CUBECLASH MATCH</strong><span>ROOM ${esc(st.roomCode||'—')}</span></div><div class="match-window-status">${esc(st.phase==='solving'?'LIVE':'CONNECTED')}</div></header><section class="match-window-videos"><article><div class="match-window-label">${st.role==='host'?'PLAYER 1 / YOU':'PLAYER 2 / YOU'}</div><video id="local" autoplay muted playsinline></video><span id="localState">CAMERA WAITING</span></article><article><div class="match-window-label">${st.role==='host'?'PLAYER 2 / OPPONENT':'PLAYER 1 / OPPONENT'}</div><video id="remote" autoplay playsinline></video><span id="remoteState">${esc(st.opponent.status||'WAITING')}</span></article></section><section class="match-window-center"><div class="match-window-scramble">${esc(st.scramble||'WAITING FOR SCRAMBLE')}</div><div class="match-window-timers"><div><small>YOU</small><strong id="myTimer">0.00</strong></div><div><small>OPPONENT</small><strong id="oppTimer">${esc(st.opponent.time||'0.00')}</strong></div></div><div class="match-window-note">Camera permission is requested in the main CubeClash tab. Keep it open while the P2P match is active.</div></section></div>`;
+    sync();
+  }
+  function sync(){
+    const b=window.opener&&window.opener.CubeClashBridge;if(!b)return;
+    const st=b.state;
+    const l=document.getElementById('local'),r=document.getElementById('remote');
+    if(l&&b.localStream&&l.srcObject!==b.localStream){l.srcObject=b.localStream;l.play().catch(()=>{});document.getElementById('localState').textContent='CAMERA CONNECTED'}
+    if(r&&b.remoteStream&&r.srcObject!==b.remoteStream){r.srcObject=b.remoteStream;r.play().catch(()=>{});document.getElementById('remoteState').textContent='OPPONENT CAMERA CONNECTED'}
+    const ot=document.getElementById('oppTimer');if(ot)ot.textContent=st.opponent.time||'0.00';
+    const os=document.getElementById('remoteState');if(os&&!b.remoteStream)os.textContent=st.opponent.status||'WAITING';
+    const mt=document.getElementById('myTimer');if(mt&&st.phase==='solving')mt.textContent='LIVE';
+  }
+  render();setInterval(()=>{if(window.opener&&!window.opener.closed){if(!document.querySelector('.match-window'))render();sync()}},500);
+})();
+</script></body></html>
