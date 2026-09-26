@@ -1,80 +1,15 @@
-const STUN=[
-  {urls:"stun:stun.l.google.com:19302"},
-  {urls:"stun:stun1.l.google.com:19302"},
-  {urls:"stun:stun.cloudflare.com:3478"}
-];
-
+const STUN=[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun.cloudflare.com:3478"}];
 export class P2PRoom{
-  constructor(){
-    this.pc=new RTCPeerConnection({iceServers:STUN});
-    this.channel=null;
-    this.handlers={message:[],state:[],error:[]};
-    this.pc.onconnectionstatechange=()=>this.emit("state",this.pc.connectionState);
-    this.pc.oniceconnectionstatechange=()=>this.emit("state",this.pc.iceConnectionState);
-    this.pc.ondatachannel=e=>this.attach(e.channel);
-  }
-  on(type,fn){(this.handlers[type]??=[]).push(fn);return this}
-  emit(type,data){for(const fn of this.handlers[type]??[])fn(data)}
-  attach(channel){
-    this.channel=channel;
-    channel.onopen=()=>this.emit("state","connected");
-    channel.onclose=()=>this.emit("state","closed");
-    channel.onerror=e=>this.emit("error",e);
-    channel.onmessage=e=>{try{this.emit("message",JSON.parse(e.data))}catch(err){this.emit("error",err)}};
-  }
-  async waitIce(){
-    if(this.pc.iceGatheringState==="complete") return;
-    await new Promise(resolve=>{
-      let finished=false;
-      const finish=()=>{
-        if(finished)return;
-        finished=true;
-        this.pc.removeEventListener("icegatheringstatechange",onState);
-        resolve();
-      };
-      const onState=()=>{if(this.pc.iceGatheringState==="complete")finish()};
-      this.pc.addEventListener("icegatheringstatechange",onState);
-      setTimeout(finish,5000);
-    });
-  }
-  async createOffer(){
-    this.attach(this.pc.createDataChannel("cubeclash",{ordered:true}));
-    const offer=await this.pc.createOffer();
-    await this.pc.setLocalDescription(offer);
-    await this.waitIce();
-    return encode(this.pc.localDescription);
-  }
-  async acceptOffer(value){
-    await this.pc.setRemoteDescription(decode(value));
-    const answer=await this.pc.createAnswer();
-    await this.pc.setLocalDescription(answer);
-    await this.waitIce();
-    return encode(this.pc.localDescription);
-  }
-  async acceptAnswer(value){
-    await this.pc.setRemoteDescription(decode(value));
-  }
-  send(value){
-    if(this.channel?.readyState!=="open") throw new Error("Data channel is not connected");
-    this.channel.send(JSON.stringify(value));
-  }
-  close(){this.channel?.close();this.pc.close()}
+ constructor(){if(!window.RTCPeerConnection)throw new Error("WebRTC is not supported by this browser.");this.pc=new RTCPeerConnection({iceServers:STUN});this.channel=null;this.handlers={message:[],state:[],error:[]};this.pc.onconnectionstatechange=()=>this.emit("state",this.pc.connectionState);this.pc.oniceconnectionstatechange=()=>this.emit("ice",this.pc.iceConnectionState);this.pc.ondatachannel=e=>this.attach(e.channel)}
+ on(t,f){(this.handlers[t]??=[]).push(f);return this} emit(t,d){for(const f of this.handlers[t]??[])try{f(d)}catch(e){console.error(e)}}
+ attach(ch){this.channel=ch;ch.onopen=()=>this.emit("state","connected");ch.onclose=()=>this.emit("state","closed");ch.onerror=e=>this.emit("error",e);ch.onmessage=e=>{try{this.emit("message",JSON.parse(e.data))}catch(err){this.emit("error",err)}}}
+ async waitIce(){if(this.pc.iceGatheringState==="complete")return;await new Promise(resolve=>{let done=false;const finish=()=>{if(done)return;done=true;clearTimeout(timer);this.pc.removeEventListener("icegatheringstatechange",check);resolve()};const check=()=>{if(this.pc.iceGatheringState==="complete")finish()};const timer=setTimeout(finish,12000);this.pc.addEventListener("icegatheringstatechange",check)})}
+ async createOffer(){this.attach(this.pc.createDataChannel("cubeclash",{ordered:true}));const offer=await this.pc.createOffer();await this.pc.setLocalDescription(offer);await this.waitIce();if(!this.pc.localDescription?.sdp)throw new Error("WebRTC did not produce an offer.");return encode(this.pc.localDescription)}
+ async acceptOffer(value){const offer=decode(value);if(offer.type!=="offer")throw new Error("This is not a Player 1 offer.");await this.pc.setRemoteDescription(offer);const answer=await this.pc.createAnswer();await this.pc.setLocalDescription(answer);await this.waitIce();if(!this.pc.localDescription?.sdp)throw new Error("WebRTC did not produce an answer.");return encode(this.pc.localDescription)}
+ async acceptAnswer(value){const answer=decode(value);if(answer.type!=="answer")throw new Error("This is not a Player 2 answer.");await this.pc.setRemoteDescription(answer)}
+ send(v){if(this.channel?.readyState!=="open")throw new Error("Data channel is not connected yet.");this.channel.send(JSON.stringify(v))}
+ close(){try{this.channel?.close();this.pc.close()}catch{}}
 }
-
-function encode(value){
-  const json=JSON.stringify(value);
-  const bytes=new TextEncoder().encode(json);
-  let binary="";
-  for(let i=0;i<bytes.length;i+=0x8000) binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
-  return btoa(binary);
-}
-function decode(value){
-  const binary=atob(value.trim());
-  const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));
-  return JSON.parse(new TextDecoder().decode(bytes));
-}
-
-export const link=(kind,data)=>{
-  const clean=encodeURIComponent(data);
-  return `${location.origin}${location.pathname}#${kind}=${clean}`;
-};
+function encode(v){return btoa(unescape(encodeURIComponent(JSON.stringify(v))))}
+function decode(v){return JSON.parse(decodeURIComponent(escape(atob(v.trim()))))}
+export const link=(kind,data)=>`${location.origin}${location.pathname}#${kind}=${encodeURIComponent(data)}`;
