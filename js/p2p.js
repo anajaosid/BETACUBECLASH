@@ -3,7 +3,7 @@ const ICE={iceServers:[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun.cl
 export class P2PRoom{
   constructor(role){
     if(!window.Peer) throw new Error("PeerJS could not load. Check your internet connection and reload the page.");
-    this.role=role; this.peer=null; this.conn=null; this.call=null; this.pendingCall=null; this.outgoingCall=null; this.handlers={message:[],state:[],error:[],stream:[]};
+    this.role=role; this.peer=null; this.conn=null; this.call=null; this.calls=[]; this.pendingCall=null; this.outgoingCall=null; this.handlers={message:[],state:[],error:[],stream:[]};
   }
   on(type,fn){(this.handlers[type]??=[]).push(fn);return this}
   emit(type,data){for(const fn of this.handlers[type]??[])try{fn(data)}catch(e){console.error(e)}}
@@ -50,7 +50,7 @@ export class P2PRoom{
   send(data){if(!this.conn||!this.conn.open)throw new Error("Player is not connected yet.");this.conn.send(data)}
   startMediaCall(stream){
     if(!this.peer||!this.conn?.peer)throw new Error("Peer connection is not ready.");
-    if(this.outgoingCall && !this.outgoingCall.open)return this.outgoingCall;
+    if(this.outgoingCall && this.outgoingCall.open)return this.outgoingCall;
     const call=this.peer.call(this.conn.peer,stream,{metadata:{kind:"cubeclash-camera"}});
     this.outgoingCall=call;
     this.attachCall(call);
@@ -68,9 +68,19 @@ export class P2PRoom{
     this.attachCall(call);
   }
   startCameraCall(stream){return this.startMediaCall(stream)}
+  async configureMedia(stream){
+    if(!stream)return;
+    const pcs=this.calls.map(c=>c?.peerConnection).filter(Boolean);
+    for(const pc of pcs){
+    for(const sender of pc.getSenders()){
+      if(sender.track?.kind!=="video")continue;
+      const p=sender.getParameters();p.encodings??=[{}];const e=p.encodings[0];e.maxBitrate=1200000;e.maxFramerate=30;e.degradationPreference="maintain-framerate";try{await sender.setParameters(p)}catch{}
+    }
+  }
   answerWithCamera(stream){return this.answerWithMedia(stream)}
   attachCall(call){
     this.call=call;
+    if(!this.calls.includes(call))this.calls.push(call);
     call.on("stream",stream=>this.emit("stream",stream));
     call.on("close",()=>this.emit("state","camera-closed"));
     call.on("error",e=>this.emit("error",normalizePeerError(e)));

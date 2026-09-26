@@ -1,7 +1,7 @@
 import {addSolve,getSolves,clearSolves,exportData,importData} from "./storage.js";
 import {wipeCubeClashData} from "./reset.js";
 import {P2PRoom} from "./p2p.js";
-const app=document.querySelector("#app"),toastEl=document.querySelector("#toast");let deferredInstall=null;let settings=JSON.parse(localStorage.getItem("cubeclash-settings")||"{}");settings.inspection??=15;settings.sound??=true;settings.name??="";let s={puzzle:"333",scramble:"",phase:"ready",matchPhase:"ready",inspectionStart:0,solveStart:0,raf:0,last:null,room:null,role:null,opponent:{time:"0.00",status:"WAITING"},round:1};
+const app=document.querySelector("#app"),toastEl=document.querySelector("#toast");let deferredInstall=null;let settings=JSON.parse(localStorage.getItem("cubeclash-settings")||"{}");settings.inspection??=15;settings.sound??=true;settings.name??="";let s={puzzle:"333",scramble:"",phase:"ready",matchPhase:"ready",inspectionStart:0,solveStart:0,raf:0,last:null,room:null,role:null,opponent:{time:"0.00",status:"WAITING"},round:1,mediaQuality:"FAIR",mediaStatsRaf:0,nextRoundReady:false};
 const savedTheme=localStorage.getItem("cubeclash-theme");
 function applyTheme(theme){document.body.classList.toggle("theme-light",theme==="light");document.documentElement.style.colorScheme=theme;localStorage.setItem("cubeclash-theme",theme);document.querySelectorAll(".theme-option").forEach(x=>x.classList.toggle("active",x.dataset.theme===theme));}
 function bindTheme(){document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>applyTheme(b.dataset.theme));}
@@ -21,7 +21,7 @@ async function solo(){if(!s.scramble)await scr();const a=await getSolves(),valid
 function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);document.querySelector("#tl").textContent=label}function stop(){cancelAnimationFrame(s.raf)}function loop(){const n=performance.now();if(s.phase==="inspection")set(Math.max(0,settings.inspection*1000-(n-s.inspectionStart)),"INSPECTION");if(s.phase==="solving")set(n-s.solveStart,"SOLVING");s.raf=requestAnimationFrame(loop)}function press(){if(s.phase==="ready"||s.phase==="stopped"){s.phase="inspection";s.inspectionStart=performance.now();loop();return}if(s.phase==="inspection"){const e=performance.now()-s.inspectionStart;s.penalty=e>=17000?"DNF":e>=15000?"+2":"";s.phase="solving";s.solveStart=performance.now();return}if(s.phase==="solving")finish()}async function finish(){const ms=performance.now()-s.solveStart;stop();s.phase="stopped";const display=s.penalty==="DNF"?"DNF":fmt(ms+(s.penalty==="+2"?2000:0));s.last={display};await addSolve({id:crypto.randomUUID(),createdAt:Date.now(),puzzle:s.puzzle,scramble:s.scramble,timeMs:ms,penalty:s.penalty,display});toast(display);setTimeout(async()=>{s.phase="ready";await scr();solo()},300)}function bindSolo(){mountCube();document.querySelector("#new").onclick=async()=>{stop();s.phase="ready";await scr();solo()};document.querySelector("#p").onchange=async e=>{s.puzzle=e.target.value;stop();s.phase="ready";await scr();solo()};document.querySelector("#copy").onclick=()=>navigator.clipboard?.writeText(s.scramble).then(()=>toast("SCRAMBLE COPIED"));document.querySelector("#zone").onpointerdown=()=>press();window.onkeydown=e=>{if((e.code==="Space"||e.code==="Enter")&&!e.repeat){e.preventDefault();press()}}}
 function tutorial(){v(`<div class="tutorial-screen"><div class="tutorial-card"><div class="tutorial-kicker">FIRST TIME SETUP / 01</div><h1 class="tutorial-title">HOW CUBECLASH WORKS</h1><p class="tutorial-intro">A quick guide before you start. You can reopen this tutorial later from the menu.</p><div class="tutorial-steps"><article><span>01</span><h2>CHOOSE A PUZZLE</h2><p>Select 2×2 or 3×3. CubeClash generates a new random-state scramble for every solve.</p></article><article><span>02</span><h2>READ THE SCRAMBLE</h2><p>The 3D cube shows the exact state produced by the scramble, so the visual matches the moves shown above it.</p></article><article><span>03</span><h2>INSPECTION</h2><p>Press Space, Enter, or touch the timer to begin inspection. Under 15 seconds is normal, 15 to under 17 seconds is +2, and 17 seconds or more is DNF.</p></article><article><span>04</span><h2>SOLVE</h2><p>Press again to start the solve, then press again when you finish. Your result is saved on this device.</p></article><article><span>05</span><h2>1V1 ROOMS</h2><p>For beta, rooms use a browser-to-browser WebRTC connection. The host and guest exchange connection data to connect.</p></article><article><span>06</span><h2>YOUR DATA</h2><p>Solves and settings stay in your browser. Use JSON export if you want a backup or to move your timer data.</p></article></div><div class="tutorial-actions"><button class="primary-btn" id="tutorialStart">I UNDERSTAND — OPEN MENU</button></div></div></div>`);document.querySelector("#tutorialStart").onclick=()=>{localStorage.setItem("cubeclash-tutorial-seen","1");home()}}
 function dashboard(){v(`<div class="hero"><div class="hero-grid"><div><div class="section-title"><small>01 / SPEEDCUBING PLATFORM</small><small>BETA</small></div><h1 class="hero-title cube-font">CUBE<span>CLASH</span></h1><p class="hero-copy">A smooth responsive 2×2 and 3×3 speedcubing timer with random-state scrambles, real 3D scramble visualization, local history, installable PWA support, and peer-to-peer 1v1 rooms.</p><div class="hero-actions"><button class="primary-btn" data-view="solo">SOLO TIMER</button><button class="ghost-btn" data-view="room">CREATE / JOIN 1V1</button></div></div><div class="technical-card"><div class="spec-list"><div class="spec"><span>PUZZLES</span><span>2×2 / 3×3</span></div><div class="spec"><span>SCRAMBLES</span><span>RANDOM-STATE</span></div><div class="spec"><span>SYNC</span><span>WEBRTC P2P</span></div><div class="spec"><span>STORAGE</span><span>INDEXEDDB</span></div><div class="spec"><span>INSTALL</span><span>PWA</span></div></div></div></div></div>`)}
-function home(){v(`<div class="menu-screen"><div class="menu-wrap"><section class="menu-main"><div class="menu-content"><div class="menu-kicker">WELCOME / CUBECLASH BETA</div><h1 class="menu-title">CUBE<span>CLASH</span></h1><p class="menu-sub">A competitive speedcubing platform for 2×2 and 3×3. Choose your appearance, then enter the timer or a 1v1 room.</p><div class="menu-actions"><button class="menu-action" data-view="solo"><span>SOLO TIMER</span><span class="arrow">→</span></button><button class="menu-action" data-view="room"><span>CREATE / JOIN 1V1</span><span class="arrow">→</span></button><button class="menu-action" data-view="settings"><span>SETTINGS</span><span class="arrow">→</span></button></div></div></section>${themePanel()}</div></div>`);bindTheme();applyTheme(savedTheme||"dark")}
+function home(){v(`<div class="menu-screen"><div class="menu-wrap"><section class="menu-main"><div class="menu-content"><div class="menu-kicker">WELCOME / CUBECLASH BETA</div><h1 class="menu-title">CUBE<span>CLASH</span></h1><p class="menu-sub">A competitive speedcubing platform for 2×2 and 3×3. Choose your appearance, then enter the timer or a 1v1 room.</p><div class="menu-actions"><button class="menu-action" data-view="solo"><span>SOLO TIMER</span><span class="arrow">→</span></button><button class="menu-action" data-view="room"><span>CREATE / JOIN 1V1</span><span class="arrow">→</span></button><button class="menu-action" data-view="settings"><span>SETTINGS</span><span class="arrow">→</span></button></div></div></section></div></div>`);applyTheme(savedTheme||"dark")}
 
 function exposeMatchBridge(){
   window.CubeClashBridge={get state(){return {role:s.role,roomCode:s.roomCode||"",scramble:s.scramble||"",puzzle:s.puzzle||"333",match:s.match||null,opponent:s.opponent||{time:"0.00",status:"WAITING"},phase:s.matchPhase||"ready",theme:localStorage.getItem("cubeclash-theme")||"dark",name:settings.name||""}},get localStream(){return s.localStream||null},get remoteStream(){return s.remoteStream||null}};
@@ -102,15 +102,21 @@ function wireRoom(){
       }
     }
     if(msg.type==="timer-finish"){
-      s.opponent.status="FINISHED"; s.opponent.time=msg.display||"—"; s.opponent.result=msg.display||"—"; s.opponent.finishedAt=Date.now(); updateMatchUI();
-      if(msg.round===s.match?.round)s.remoteRoundResult=msg.display||"DNF";
+      s.opponent.status="FINISHED"; s.opponent.time=msg.display||"—"; s.opponent.result=msg.display||"—"; s.opponent.rawMs=msg.rawMs||0; s.opponent.finishedAt=Date.now(); updateMatchUI();
+      if(msg.round===s.match?.round){s.remoteRoundResult=msg.display||"DNF";s.remotePenalty=msg.penalty||"";s.remoteRawMs=msg.rawMs||0;}
       maybeResolveRound();
+    }
+    if(msg.type==="timer-result-update"){
+      if(msg.round===s.match?.round){s.remoteRoundResult=msg.display||"DNF";s.remotePenalty=msg.penalty||"";s.opponent.time=msg.display||s.opponent.time;s.opponent.result=msg.display||s.opponent.result;updateMatchUI();maybeResolveRound(true)}
     }
     if(msg.type==="round-result"){
       if(msg.round===s.match?.round){s.roundResult=msg;updateMatchUI();}
     }
+    if(msg.type==="next-round-ready"){
+      if(msg.round===s.match?.round){s.remoteNextRoundReady=true;updateMatchUI();if(s.nextRoundReady)advanceRound();}
+    }
     if(msg.type==="next-round"){
-      s.match.round=msg.round; s.match.score=msg.score||s.match.score; s.scramble=msg.scramble||randomScramble(); resetMatchRound();
+      s.match.round=msg.round; s.match.score=msg.score||s.match.score; s.scramble=msg.scramble||randomScramble(); s.nextRoundReady=false;s.remoteNextRoundReady=false; resetMatchRound();
     }
     if(msg.type==="match-over"){
       s.match.status="FINISHED"; s.match.winner=msg.winner||"DRAW"; updateMatchUI();
@@ -119,6 +125,19 @@ function wireRoom(){
     s.remoteStream=stream; const v=document.querySelector("#remoteVideo"); if(v){v.srcObject=stream; v.autoplay=true; v.playsInline=true; v.play().catch(()=>{document.querySelector("#remoteVideo")?.setAttribute("controls","true")})} const note=document.querySelector("#remoteCamState"); if(note)note.textContent="OPPONENT CAMERA + MIC CONNECTED";
   }).on("error",err=>{console.error("CubeClash P2P error",err);toast(err.message||String(err));});
 }
+async function startMediaQualityMonitor(){
+  cancelAnimationFrame(s.mediaStatsRaf);
+  const tick=async()=>{
+    let quality="GOOD";
+    try{
+      const call=s.room?.call, pc=call?.peerConnection;
+      if(pc?.getStats){let rtt=0,loss=0,packets=0,bytes=0;const stats=await pc.getStats();stats.forEach(x=>{if(x.type==="candidate-pair"&&(x.state==="succeeded"||x.nominated)){rtt=Math.max(rtt,(x.currentRoundTripTime||0)*1000)}if(x.type==="inbound-rtp"&&x.kind==="video"){loss+=x.packetsLost||0;packets+=x.packetsReceived||0;bytes+=x.bytesReceived||0}});const lossRate=packets?loss/(packets+loss):0;if(rtt>250||lossRate>.08)quality="POOR";else if(rtt>120||lossRate>.03)quality="FAIR";else quality="GOOD";}
+    }catch{}
+    s.mediaQuality=quality;updateMatchUI();try{await s.room?.configureMediaQuality(quality)}catch{};s.mediaStatsRaf=setTimeout(()=>startMediaQualityMonitor(),1200);
+  };
+  tick();
+}
+function setMediaSenderParams(){try{s.room?.configureMedia(s.localStream)}catch(e){console.warn(e)}}
 async function showCameraPermission(){
   if(!s.room)return;
   renderMatch(true);
@@ -128,8 +147,10 @@ async function showCameraPermission(){
   allow.onclick=async()=>{
     try{
       if(!navigator.mediaDevices?.getUserMedia)throw new Error("Camera and microphone access is not supported in this browser.");
-      s.localStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+      s.localStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:1280,max:1280},height:{ideal:720,max:720},frameRate:{ideal:30,max:30},resizeMode:"crop-and-scale"},audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true,channelCount:{ideal:1}}});
       const local=document.querySelector("#localVideo"); if(local){local.srcObject=s.localStream;local.play().catch(()=>{})}
+      try{await s.room.configureMedia(s.localStream)}catch(e){console.warn("media tuning",e)}
+      startMediaQualityMonitor();
       modal.hidden=true; updateCameraState("CAMERA + MIC READY");
       if(s.room.pendingCall){try{s.room.answerWithMedia(s.localStream)}catch(e){console.error(e)}}
       try{s.room.send({type:"camera-ready"})}catch(e){console.error(e)}
@@ -168,12 +189,15 @@ function render2DScramble(){
 function renderMatch(preconnect=false){
   if(window._cubeClashMatchKeyHandler){document.removeEventListener("keydown",window._cubeClashMatchKeyHandler,true);window._cubeClashMatchKeyHandler=null;}
   const rounds=s.match?.rounds||1, round=s.match?.round||1, score=s.match?.score||[0,0];
-  v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?(settings.name||"PLAYER 1")+" / HOST":(s.match?.names?.guest||"PLAYER 2")+" / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${round} / ${rounds}</span><span id="matchScore">${score[0]} — ${score[1]}</span><button class="ghost-btn" id="exitMatch">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">${s.localStream?"CAMERA + MIC READY":"CAMERA + MIC WAITING"}</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA + MIC</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?(settings.name||"PLAYER 1"):(s.match?.names?.guest||"PLAYER 2")}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div></div></div><div class="center-match"><div class="scramble-2d"><div class="scramble-2d-label">2D SCRAMBLE VISUALIZATION</div><div class="scramble-net" id="scramble2DVisual"></div><div class="center-scramble" id="matchScramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div></div><div class="match-instructions"><span class="desktop-only">SPACE / ENTER — INSPECTION → SOLVE → FINISH</span><span class="mobile-only">TAP TIMER — INSPECTION · LONG PRESS — START · TAP — FINISH</span></div><div class="match-timer-zone" id="matchTimerZone"><div class="match-main-timer" id="matchMainTimer">0.00</div><div class="match-main-label" id="matchMainLabel">READY</div></div><div class="match-controls"><span class="match-connection" id="matchConnection">${preconnect?"CONNECTING":"CONNECTED"}</span><button class="ghost-btn" id="nextRound" hidden>NEXT ROUND</button></div></div><div class="player-card"><div class="player-name">${s.role==="host"?(s.match?.names?.guest||"PLAYER 2"):(s.match?.names?.host||"PLAYER 1")}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA + MICROPHONE</div><h2>ALLOW CAMERA + MIC</h2><p>Both players are connected. Allow CubeClash to use your camera and microphone for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA + MIC</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA + MIC</button></div></div></div></div>`);
+  v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?(settings.name||"PLAYER 1")+" / HOST":(s.match?.names?.guest||"PLAYER 2")+" / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${round} / ${rounds}</span><span id="matchScore">${score[0]} — ${score[1]}</span><button class="ghost-btn" id="exitMatch">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">${s.localStream?"CAMERA + MIC READY":"CAMERA + MIC WAITING"}</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA + MIC</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?(settings.name||"PLAYER 1"):(s.match?.names?.guest||"PLAYER 2")}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div></div></div><div class="center-match"><div class="scramble-2d"><div class="scramble-2d-label">2D SCRAMBLE VISUALIZATION</div><div class="scramble-net" id="scramble2DVisual"></div><div class="center-scramble" id="matchScramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div></div><div class="match-instructions"><span class="desktop-only">SPACE / ENTER — INSPECTION → SOLVE → FINISH</span><span class="mobile-only">TAP TIMER — INSPECTION · LONG PRESS — START · TAP — FINISH</span></div><div class="match-timer-zone" id="matchTimerZone"><div class="match-main-timer" id="matchMainTimer">0.00</div><div class="match-main-label" id="matchMainLabel">READY</div></div><div class="match-result-tools" id="matchResultTools" hidden><div class="penalty-label">RESULT ADJUSTMENT</div><div class="penalty-buttons"><button class="ghost-btn penalty-btn" id="penaltyPlus2">+2</button><button class="ghost-btn penalty-btn" id="penaltyDnf">DNF</button></div><div class="result-note" id="resultNote"></div></div><div class="match-controls"><span class="match-connection" id="matchConnection">${preconnect?"CONNECTING":"CONNECTED"}</span><span class="media-quality" id="mediaQuality">CONNECTION: ${s.mediaQuality||"FAIR"}</span><button class="ghost-btn" id="muteMic">MIC ON</button><button class="ghost-btn" id="nextRound" hidden>NEXT ROUND</button></div></div><div class="player-card"><div class="player-name">${s.role==="host"?(s.match?.names?.guest||"PLAYER 2"):(s.match?.names?.host||"PLAYER 1")}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA + MICROPHONE</div><h2>ALLOW CAMERA + MIC</h2><p>Both players are connected. Allow CubeClash to use your camera and microphone for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA + MIC</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA + MIC</button></div></div></div></div>`);
   requestAnimationFrame(()=>{render2DScramble();setTimeout(render2DScramble,60);});
   if(s.localStream){const lv=document.querySelector("#localVideo");if(lv)lv.srcObject=s.localStream}
   if(s.remoteStream){const rv=document.querySelector("#remoteVideo");if(rv)rv.srcObject=s.remoteStream}
   document.querySelector("#exitMatch").onclick=()=>home();
   document.querySelector("#nextRound").onclick=nextRound;
+  document.querySelector("#penaltyPlus2").onclick=()=>setMatchPenalty("+2");
+  document.querySelector("#penaltyDnf").onclick=()=>setMatchPenalty("DNF");
+  document.querySelector("#muteMic").onclick=toggleMic;
   bindMatchTimer(); updateCameraState(s.localStream?"CAMERA + MIC READY":"CAMERA + MIC WAITING"); updateMatchUI();
 }
 function isMobileTimer(){return window.matchMedia?.("(pointer:coarse)").matches||window.innerWidth<=760}
@@ -210,6 +234,7 @@ function bindMatchTimer(){
   window._cubeClashMatchKeyHandler=keyHandler;
 }
 
+function toggleMic(){const tracks=s.localStream?.getAudioTracks()||[];if(!tracks.length){toast("MIC NOT AVAILABLE");return}const on=!tracks[0].enabled;tracks.forEach(t=>t.enabled=on);const b=document.querySelector("#muteMic");if(b)b.textContent=on?"MIC ON":"MIC OFF";toast(on?"MIC ON":"MIC MUTED")}
 function updateCameraState(text){const e=document.querySelector("#localCamState");if(e)e.textContent=text}
 function setOpponentState(status,time,round){
   s.opponent.status=status;
@@ -238,10 +263,27 @@ function updateMatchUI(){
   const t=document.querySelector("#oppTimer"),st=document.querySelector("#oppState"),sc=document.querySelector("#matchScore"),r=document.querySelector("#matchRound"),mt=document.querySelector("#matchMainTimer"),ml=document.querySelector("#matchMainLabel");
   if(t)t.textContent=s.opponent.time||"0.00"; if(st)st.textContent=s.opponent.status||"WAITING"; if(sc)sc.textContent=`${s.match?.score?.[0]||0} — ${s.match?.score?.[1]||0}`; if(r)r.textContent=`ROUND ${s.match?.round||1} / ${s.match?.rounds||1}`;
   if(mt&&s.matchPhase==="ready")mt.textContent="0.00"; if(ml)ml.textContent=s.matchPhase==="inspection"?"INSPECTION":s.matchPhase==="solving"?"SOLVING":s.matchPhase==="finished"?"FINISHED":"READY";
-  const nr=document.querySelector("#nextRound");
+  const nr=document.querySelector("#nextRound"), tools=document.querySelector("#matchResultTools"), note=document.querySelector("#resultNote");
   const bothFinished=!!s.myRoundResult&&!!s.remoteRoundResult;
-  if(nr){const allowed=bothFinished&&!!s.roundResult&&s.match?.round<(s.match?.rounds||1);nr.hidden=!allowed;nr.disabled=!allowed;}
+  const finalRound=s.match?.round>=(s.match?.rounds||1);
+  if(nr){const allowed=bothFinished&&!finalRound;nr.hidden=!allowed;nr.disabled=!allowed;nr.textContent=s.nextRoundReady?"WAITING FOR OPPONENT":"NEXT ROUND";}
+  if(tools)tools.hidden=s.matchPhase!=="finished";
+  if(note)note.textContent=s.matchPhase==="finished"?`YOUR RESULT: ${s.myRoundResult||"—"}${s.matchPenalty?` / ${s.matchPenalty}`:""}`:"";
+  const q=document.querySelector("#mediaQuality");if(q)q.textContent=`CONNECTION: ${s.mediaQuality||"FAIR"}`;
 }
+function setMatchPenalty(penalty){
+  if(s.matchPhase!=="finished"||!s.myRoundResult)return;
+  s.matchPenalty=s.matchPenalty===penalty?"":penalty;
+  const base=s.matchRawMs||0;
+  const display=s.matchPenalty==="DNF"?"DNF":fmt(base+(s.matchPenalty==="+2"?2000:0));
+  s.myRoundResult=display;
+  const a=document.querySelector("#matchMainTimer"),b=document.querySelector("#myTimer");if(a)a.textContent=display;if(b)b.textContent=display;
+  document.querySelectorAll(".penalty-btn").forEach(x=>x.classList.remove("active"));
+  if(s.matchPenalty)document.querySelector(s.matchPenalty==="+2"?"#penaltyPlus2":"#penaltyDnf")?.classList.add("active");
+  try{s.room?.send({type:"timer-result-update",display,penalty:s.matchPenalty,round:s.match?.round||1})}catch{}
+  maybeResolveRound(true);
+}
+
 function matchInspection(){
   if(s.matchPhase&&s.matchPhase!=="ready"&&s.matchPhase!=="finished")return;
   s.matchPhase="inspection"; s.matchPenalty=""; s.matchInspectionStart=performance.now(); s.matchInspectionStartedAt=Date.now();
@@ -274,15 +316,18 @@ function sendMatchTimerTick(){
 function setMatchTimer(ms,label){const a=document.querySelector("#matchMainTimer");if(a)a.textContent=fmt(ms);const b=document.querySelector("#matchMainLabel");if(b)b.textContent=label;const c=document.querySelector("#myTimer");if(c)c.textContent=fmt(ms)}
 function matchFinish(){
   if(s.matchPhase!=="solving")return; cancelAnimationFrame(s.matchRaf); const ms=performance.now()-s.matchSolveStart; s.matchPhase="finished";
-  const display=s.matchPenalty==="DNF"?"DNF":fmt(ms+(s.matchPenalty==="+2"?2000:0)); s.myRoundResult=display; s.opponent.self=display;
+  s.matchRawMs=ms; const display=fmt(ms); s.myRoundResult=display; s.opponent.self=display;
   const a=document.querySelector("#matchMainTimer"),b=document.querySelector("#myTimer"),c=document.querySelector("#myState");if(a)a.textContent=display;if(b)b.textContent=display;if(c)c.textContent=s.matchPenalty?`FINISHED / ${s.matchPenalty}`:"FINISHED";
-  try{s.room?.send({type:"timer-finish",display,round:s.match?.round||1})}catch{} updateMatchUI(); maybeResolveRound();
+  try{s.room?.send({type:"timer-finish",display,rawMs:ms,penalty:"",round:s.match?.round||1})}catch{} updateMatchUI(); maybeResolveRound();
 }
 function resultValue(x){if(!x||x==="DNF")return Infinity;return parseFloat(x)}
-function maybeResolveRound(){
+function maybeResolveRound(force=false){
   if(!s.myRoundResult||!s.remoteRoundResult)return;
+  const alreadyResolved=s._roundResolved===s.match?.round;
+  if(alreadyResolved && !force)return;
+  if(!alreadyResolved)s._roundResolved=s.match?.round;
   const a=resultValue(s.myRoundResult),b=resultValue(s.remoteRoundResult);let winner="DRAW";if(a<b)winner=s.role==="host"?(settings.name||"PLAYER 1"):(s.match?.names?.guest||"PLAYER 2");if(b<a)winner=s.role==="host"?(s.match?.names?.guest||"PLAYER 2"):(settings.name||"PLAYER 1");
-  if(winner==="PLAYER 1")s.match.score[0]++; if(winner==="PLAYER 2")s.match.score[1]++;
+  if(!alreadyResolved){if(winner==="PLAYER 1")s.match.score[0]++; if(winner==="PLAYER 2")s.match.score[1]++;}
   s.roundResult={round:s.match.round,winner,p1:s.role==="host"?s.myRoundResult:s.remoteRoundResult,p2:s.role==="host"?s.remoteRoundResult:s.myRoundResult};
   if(s.role==="host"){
     try{s.room.send({type:"round-result",...s.roundResult,round:s.match.round,score:s.match.score})}catch{}
@@ -291,11 +336,21 @@ function maybeResolveRound(){
   updateMatchUI();
 }
 function nextRound(){
-  if(s.role!=="host"||!s.roundResult||s.match.round>=s.match.rounds)return;
-  s.match.round++; s.match.status="PLAYING"; s.scramble=randomScramble(); s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.opponent={time:"0.00",status:"WAITING"};
-  try{s.room.send({type:"next-round",round:s.match.round,score:s.match.score,scramble:s.scramble})}catch{} resetMatchRound();
+  if(!s.roundResult||s.match.round>=(s.match.rounds||1)||!s.myRoundResult||!s.remoteRoundResult)return;
+  if(s.nextRoundReady)return;
+  s.nextRoundReady=true; updateMatchUI();
+  try{s.room.send({type:"next-round-ready",round:s.match.round})}catch{}
+  if(s.remoteNextRoundReady)advanceRound();
 }
-function resetMatchRound(){s.matchPhase="ready";s.matchPenalty="";cancelAnimationFrame(s.matchRaf);cancelAnimationFrame(s.opponentRaf);s.opponent={time:"0.00",status:"WAITING"};s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;renderMatch(false)}
+function advanceRound(){
+  if(!s.nextRoundReady||!s.remoteNextRoundReady||s.match.round>=(s.match.rounds||1))return;
+  if(s.role==="host"){
+    s.match.round++; s.match.status="PLAYING"; s.scramble=randomScramble(); s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.opponent={time:"0.00",status:"WAITING"};s.nextRoundReady=false;s.remoteNextRoundReady=false;s._roundResolved=null;
+    try{s.room.send({type:"next-round",round:s.match.round,score:s.match.score,scramble:s.scramble})}catch{} resetMatchRound();
+  }
+}
+
+function resetMatchRound(){s.matchPhase="ready";s.matchPenalty="";cancelAnimationFrame(s.matchRaf);cancelAnimationFrame(s.opponentRaf);s.opponent={time:"0.00",status:"WAITING"};s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.matchRawMs=0;s.matchPenalty="";s.nextRoundReady=false;s.remoteNextRoundReady=false;s._roundResolved=null;renderMatch(false)}
 function settingsView(){v(`<div class="section-title"><h1>SETTINGS</h1><small>LOCAL DEVICE</small></div><div class="settings-grid"><div class="setting-card"><h2>APPEARANCE</h2><div class="theme-options" style="margin-top:14px"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div></div><div class="setting-card"><h2>PROFILE</h2><div class="field"><label>DISPLAY NAME</label><input id="displayName" maxlength="24" value="${esc(settings.name||"")}" placeholder="YOUR NAME" autocomplete="nickname"></div><p style="color:#666;font-size:12px;line-height:1.6">Your name is shown to the other player during 1v1 matches.</p></div><div class="setting-card"><h2>TIMER</h2><div class="field"><label>INSPECTION SECONDS</label><select id="ins"><option ${settings.inspection===0?"selected":""}>0</option><option ${settings.inspection===10?"selected":""}>10</option><option ${settings.inspection===15?"selected":""}>15</option></select></div><div class="room-actions"><button class="primary-btn" id="save">SAVE SETTINGS</button></div></div><div class="setting-card"><h2>DATA</h2><p style="color:#666;font-size:12px;line-height:1.6">Solves are stored locally in IndexedDB. Export your times before clearing browser data or moving to another device.</p><div class="room-actions"><button class="ghost-btn" id="ex">EXPORT JSON</button><label class="ghost-btn" style="display:grid;place-items:center;cursor:pointer">IMPORT JSON<input id="im" type="file" accept=".json" hidden></label><button class="danger-btn" id="cl">CLEAR SOLVES</button></div></div><div class="setting-card wipe-card"><h2>RESET / UPDATE</h2><p style="color:#666;font-size:12px;line-height:1.6">Use this when a new CubeClash update is installed and the old service worker or cached files are causing problems. CubeClash will automatically download a JSON backup of your solve history first, then clear local app data, caches, and the service worker.</p><div class="room-actions"><button class="danger-btn" id="wipeAll">EXPORT + WIPE APP DATA</button></div></div></div>`);bindTheme();applyTheme(localStorage.getItem("cubeclash-theme")||"dark");document.querySelector("#save").onclick=()=>{settings.inspection=+document.querySelector("#ins").value;settings.name=(document.querySelector("#displayName")?.value||"").trim().slice(0,24);localStorage.setItem("cubeclash-settings",JSON.stringify(settings));toast("SETTINGS SAVED")};document.querySelector("#ex").onclick=async()=>{const b=new Blob([JSON.stringify(await exportData(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`cubeclash-${Date.now()}.json`;a.click()};document.querySelector("#im").onchange=async e=>{try{await importData(JSON.parse(await e.target.files[0].text()));toast("DATA IMPORTED")}catch{toast("IMPORT FAILED")}};document.querySelector("#cl").onclick=async()=>{if(confirm("Clear all local solves? This cannot be undone unless you exported them.")){await clearSolves();toast("SOLVES CLEARED")}};document.querySelector("#wipeAll").onclick=async()=>{if(!confirm("CubeClash will export your solve history and then clear local app data, cache, settings, and service worker. Continue?"))return;try{await wipeCubeClashData({downloadBackup:true});alert("Backup downloaded. CubeClash will reload with a clean installation.");location.reload()}catch(e){console.error(e);toast("RESET FAILED")}}}
 async function nav(x){if(x==="home")home();if(x==="solo")await solo();if(x==="room")room();if(x==="settings")settingsView()}document.addEventListener("click",e=>{const x=e.target.closest("[data-view]");if(x)nav(x.dataset.view)});window.addEventListener("online",()=>{document.querySelector("#networkText").textContent="ONLINE"});window.addEventListener("offline",()=>{document.querySelector("#networkText").textContent="OFFLINE"});window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;document.querySelector("#installBtn").hidden=false});document.querySelector("#installBtn").onclick=async()=>{if(deferredInstall){await deferredInstall.prompt();deferredInstall=null}};if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("./service-worker.js");
 if(localStorage.getItem("cubeclash-tutorial-seen")==="1")home();else tutorial();

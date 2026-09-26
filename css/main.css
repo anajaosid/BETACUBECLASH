@@ -85,3 +85,7 @@ body:not(.theme-light) .match-page .match-main-timer{color:#fff!important}
 body.theme-light .match-page .match-main-timer{color:#090909!important}
 .match-page .match-timer-zone:focus{outline:2px solid var(--text);outline-offset:-2px}
 @media(min-width:761px){.match-page .scramble-net{width:min(430px,100%);min-height:190px}}
+.match-result-tools{display:grid;gap:8px;margin-top:12px;padding:12px;border:1px solid var(--line);background:var(--panel)}
+.penalty-label,.result-note{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.penalty-buttons{display:flex;gap:8px}.penalty-btn.active{border-color:currentColor;font-weight:800}
+.media-quality{font-size:10px;letter-spacing:.1em;opacity:.8}
