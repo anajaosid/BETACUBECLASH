@@ -3,6 +3,7 @@ const STUN=[
   {urls:"stun:stun1.l.google.com:19302"},
   {urls:"stun:stun.cloudflare.com:3478"}
 ];
+
 export class P2PRoom{
   constructor(){
     this.pc=new RTCPeerConnection({iceServers:STUN});
@@ -12,39 +13,68 @@ export class P2PRoom{
     this.pc.oniceconnectionstatechange=()=>this.emit("state",this.pc.iceConnectionState);
     this.pc.ondatachannel=e=>this.attach(e.channel);
   }
-  on(t,f){(this.handlers[t]??=[]).push(f);return this}
-  emit(t,d){for(const f of this.handlers[t]??[])f(d)}
-  attach(c){
-    this.channel=c;
-    c.onopen=()=>this.emit("state","connected");
-    c.onclose=()=>this.emit("state","closed");
-    c.onerror=e=>this.emit("error",e);
-    c.onmessage=e=>{try{this.emit("message",JSON.parse(e.data))}catch(err){this.emit("error",err)}};
+  on(type,fn){(this.handlers[type]??=[]).push(fn);return this}
+  emit(type,data){for(const fn of this.handlers[type]??[])fn(data)}
+  attach(channel){
+    this.channel=channel;
+    channel.onopen=()=>this.emit("state","connected");
+    channel.onclose=()=>this.emit("state","closed");
+    channel.onerror=e=>this.emit("error",e);
+    channel.onmessage=e=>{try{this.emit("message",JSON.parse(e.data))}catch(err){this.emit("error",err)}};
   }
   async waitIce(){
-    if(this.pc.iceGatheringState==="complete")return;
+    if(this.pc.iceGatheringState==="complete") return;
     await new Promise(resolve=>{
-      const done=()=>{this.pc.removeEventListener("icegatheringstatechange",done);resolve()};
-      this.pc.addEventListener("icegatheringstatechange",()=>{if(this.pc.iceGatheringState==="complete")done()});
-      setTimeout(done,8000);
+      let finished=false;
+      const finish=()=>{
+        if(finished)return;
+        finished=true;
+        this.pc.removeEventListener("icegatheringstatechange",onState);
+        resolve();
+      };
+      const onState=()=>{if(this.pc.iceGatheringState==="complete")finish()};
+      this.pc.addEventListener("icegatheringstatechange",onState);
+      setTimeout(finish,5000);
     });
   }
   async createOffer(){
     this.attach(this.pc.createDataChannel("cubeclash",{ordered:true}));
-    await this.pc.setLocalDescription(await this.pc.createOffer());
+    const offer=await this.pc.createOffer();
+    await this.pc.setLocalDescription(offer);
     await this.waitIce();
     return encode(this.pc.localDescription);
   }
-  async acceptOffer(v){
-    await this.pc.setRemoteDescription(decode(v));
-    await this.pc.setLocalDescription(await this.pc.createAnswer());
+  async acceptOffer(value){
+    await this.pc.setRemoteDescription(decode(value));
+    const answer=await this.pc.createAnswer();
+    await this.pc.setLocalDescription(answer);
     await this.waitIce();
     return encode(this.pc.localDescription);
   }
-  async acceptAnswer(v){await this.pc.setRemoteDescription(decode(v));}
-  send(x){if(this.channel?.readyState==="open")this.channel.send(JSON.stringify(x));}
-  close(){this.channel?.close();this.pc.close();}
+  async acceptAnswer(value){
+    await this.pc.setRemoteDescription(decode(value));
+  }
+  send(value){
+    if(this.channel?.readyState!=="open") throw new Error("Data channel is not connected");
+    this.channel.send(JSON.stringify(value));
+  }
+  close(){this.channel?.close();this.pc.close()}
 }
-function encode(x){return btoa(unescape(encodeURIComponent(JSON.stringify(x))))}
-function decode(x){return JSON.parse(decodeURIComponent(escape(atob(x))))}
-export const link=(kind,data)=>`${location.origin}${location.pathname}#${kind}=${encodeURIComponent(data)}`;
+
+function encode(value){
+  const json=JSON.stringify(value);
+  const bytes=new TextEncoder().encode(json);
+  let binary="";
+  for(let i=0;i<bytes.length;i+=0x8000) binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
+  return btoa(binary);
+}
+function decode(value){
+  const binary=atob(value.trim());
+  const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+export const link=(kind,data)=>{
+  const clean=encodeURIComponent(data);
+  return `${location.origin}${location.pathname}#${kind}=${clean}`;
+};
