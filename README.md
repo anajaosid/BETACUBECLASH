@@ -1,43 +1,38 @@
 # CubeClash
 
-CubeClash is a responsive 2×2 / 3×3 speedcubing timer with local solve history, installable PWA support, 3D scramble visualization, and browser-to-browser 1v1 rooms.
+CubeClash is a browser-based speedcubing timer made for practicing 2×2 and 3×3 solves and playing simple 1v1 matches with another player.
 
-## Scrambles
+## What it can do
 
-The beta generates practice scrambles locally. The 3D visualization uses the exact same scramble string to build the displayed cube state.
+- 2×2 and 3×3 speedcubing timer
+- Scrambles generated directly in the browser
+- 3D scramble visualization for solo solving
+- Local solve history and statistics
+- Custom inspection time
+- Dark and white themes
+- Player display name for 1v1 matches
+- 1v1 rooms using a short room code
+- Live opponent timer during a match
+- Camera and microphone support for players
+- Connection quality indicator
+- Microphone mute/unmute
+- Multiple rounds with round results and scores
+- +2 and DNF options
+- Installable as a PWA on supported devices
+- JSON export and import for solve data
 
-For official WCA competition scrambling, always use the current official WCA scramble program; CubeClash is intended for practice and online play.
+## What it is for
 
-## Run
+CubeClash is designed for speedcubers who want a simple timer for solo practice and a lightweight way to race a friend online. The multiplayer mode lets two players join the same room, see each other, follow the same scramble, and compare their solve results round by round.
 
-```bash
-python3 -m http.server 8080
-```
+CubeClash is still a beta project, so some features may change as it continues to be improved.
 
-Open `http://localhost:8080`.
+## Running it
 
-For GitHub Pages, upload the project and enable Pages. HTTPS is required for normal WebRTC/PWA behavior.
+CubeClash is a static web app, so it can be hosted on GitHub Pages or another static website host.
 
-## PWA
+For normal camera, microphone, PWA, and WebRTC features, use an HTTPS site such as GitHub Pages.
 
-Supported browsers can install CubeClash to the home screen/desktop. iOS Safari can use Share → Add to Home Screen.
+## Creator
 
-## 1v1
-
-The multiplayer beta now uses PeerJS as the signaling/brokering layer and WebRTC for the actual peer connection. Player 1 clicks **CREATE ROOM** and receives a short room code. Player 2 enters that code and clicks **JOIN ROOM**. No offer/answer copy-and-paste is required.
-
-After both browsers connect, CubeClash shows a camera permission dialog. Video is sent peer-to-peer through WebRTC after permission is granted. Microphone access is not requested.
-
-PeerJS provides the signaling service needed to discover the other browser; the application match data and camera stream use the peer connection. A TURN service may still be needed on some restrictive networks.
-
-## 3D scramble viewer
-
-The v6 local 3D cube renderer is intentionally retained. It does not depend on the TwistyPlayer CDN and builds the visible cube from the generated scramble state.
-
-## Reset after an update
-
-Open **Settings → Export + Wipe App Data** when an update appears stuck on an older cached version. CubeClash downloads a JSON backup of the local solve history first, then clears IndexedDB, local settings, Cache Storage, and the service worker before reloading.
-
-## Multiplayer single-page match
-
-After a host creates a room or a guest joins, CubeClash opens a separate same-origin match tab. The main CubeClash tab owns the PeerJS/WebRTC connection and camera streams; the match tab mirrors the local and opponent video, scramble, and match state. If the browser blocks the new tab, use **OPEN MATCH WINDOW** from the room status before entering the match.
+Created and developed by **Sid Anajao**.
