@@ -48,7 +48,7 @@ export class P2PRoom{
     conn.on("error",e=>this.emit("error",normalizePeerError(e)));
   }
   send(data){if(!this.conn||!this.conn.open)throw new Error("Player is not connected yet.");this.conn.send(data)}
-  startCameraCall(stream){
+  startMediaCall(stream){
     if(!this.peer||!this.conn?.peer)throw new Error("Peer connection is not ready.");
     if(this.outgoingCall && !this.outgoingCall.open)return this.outgoingCall;
     const call=this.peer.call(this.conn.peer,stream,{metadata:{kind:"cubeclash-camera"}});
@@ -60,13 +60,15 @@ export class P2PRoom{
     this.pendingCall=call;
     this.emit("state","camera-requested");
   }
-  answerWithCamera(stream){
-    if(!this.pendingCall)throw new Error("No incoming camera request.");
+  answerWithMedia(stream){
+    if(!this.pendingCall)throw new Error("No incoming media request.");
     const call=this.pendingCall;
     this.pendingCall=null;
     call.answer(stream);
     this.attachCall(call);
   }
+  startCameraCall(stream){return this.startMediaCall(stream)}
+  answerWithCamera(stream){return this.answerWithMedia(stream)}
   attachCall(call){
     this.call=call;
     call.on("stream",stream=>this.emit("stream",stream));
