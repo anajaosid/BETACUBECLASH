@@ -82,7 +82,7 @@ function wireRoom(){
     if(!msg||typeof msg!=="object")return;
     if(msg.type==="match-config"&&s.role==="guest"){
       s.match=msg.match; s.puzzle=msg.match.puzzle; s.scramble=msg.scramble||randomScramble();
-      renderMatch(true); setTimeout(()=>showCameraPermission(),0); toast("MATCH READY"); return;
+      renderMatch(false); setTimeout(()=>showCameraPermission(),0); toast("MATCH READY"); return;
     }
     if(msg.type==="player-name"&&s.role==="host"){
       s.match=s.match||{}; s.match.names=s.match.names||{}; s.match.names.guest=(msg.name||"PLAYER 2").slice(0,24);
@@ -116,7 +116,7 @@ function wireRoom(){
 }
 async function showCameraPermission(){
   if(!s.room)return;
-  renderMatch(true);
+  renderMatch(false);
   const modal=document.querySelector("#cameraModal"); if(!modal)return; modal.hidden=false;
   const allow=document.querySelector("#allowCamera"),skip=document.querySelector("#skipCamera");
   allow.onclick=async()=>{
@@ -162,7 +162,7 @@ function render2DScramble(){
 function renderMatch(preconnect=false){
   if(window._cubeClashMatchKeyHandler){document.removeEventListener("keydown",window._cubeClashMatchKeyHandler,true);window._cubeClashMatchKeyHandler=null;}
   const rounds=s.match?.rounds||1, round=s.match?.round||1, score=s.match?.score||[0,0];
-  v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?(settings.name||"PLAYER 1")+" / HOST":(s.match?.names?.guest||"PLAYER 2")+" / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${round} / ${rounds}</span><span id="matchScore">${score[0]} — ${score[1]}</span><button class="ghost-btn" id="exitMatch">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">${s.localStream?"CAMERA + MIC READY":"CAMERA + MIC WAITING"}</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA + MIC</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?(settings.name||"PLAYER 1"):(s.match?.names?.guest||"PLAYER 2")}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div></div></div><div class="center-match"><div class="scramble-2d"><div class="scramble-2d-label">2D SCRAMBLE VISUALIZATION</div><div class="scramble-net" id="scramble2DVisual"></div><div class="center-scramble" id="matchScramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div></div><div class="match-instructions"><span class="desktop-only">SPACE / ENTER — INSPECTION → SOLVE → FINISH</span><span class="mobile-only">TAP TIMER — INSPECTION · LONG PRESS — START · TAP — FINISH</span></div><div class="match-timer-zone" id="matchTimerZone"><div class="match-main-timer" id="matchMainTimer">0.00</div><div class="match-main-label" id="matchMainLabel">READY</div></div><div class="match-controls"><span class="match-connection" id="matchConnection">${preconnect?"CONNECTING":"CONNECTED"}</span><button class="ghost-btn" id="nextRound" hidden>NEXT ROUND</button></div></div><div class="player-card"><div class="player-name">${s.role==="host"?(s.match?.names?.guest||"PLAYER 2"):(s.match?.names?.host||"PLAYER 1")}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA + MICROPHONE</div><h2>ALLOW CAMERA + MIC</h2><p>Both players are connected. Allow CubeClash to use your camera and microphone for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA + MIC</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA + MIC</button></div></div></div></div>`);
+  v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?(settings.name||"PLAYER 1")+" / HOST":(s.match?.names?.guest||"PLAYER 2")+" / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${round} / ${rounds}</span><span id="matchScore">${score[0]} — ${score[1]}</span><button class="ghost-btn" id="exitMatch">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">${s.localStream?"CAMERA + MIC READY":"CAMERA + MIC WAITING"}</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA + MIC</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?(settings.name||"PLAYER 1"):(s.match?.names?.guest||"PLAYER 2")}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div></div></div><div class="center-match"><div class="scramble-2d"><div class="scramble-2d-label">2D SCRAMBLE VISUALIZATION</div><div class="scramble-net" id="scramble2DVisual"></div><div class="center-scramble" id="matchScramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div></div><div class="match-instructions"><span class="desktop-only">SPACE / ENTER — INSPECTION → SOLVE → FINISH</span><span class="mobile-only">TAP TIMER — INSPECTION · LONG PRESS — START · TAP — FINISH</span></div><div class="match-timer-zone" id="matchTimerZone"><div class="match-main-timer" id="matchMainTimer">0.00</div><div class="match-main-label" id="matchMainLabel">READY</div></div><div class="match-controls"><span class="match-connection" id="matchConnection">${s.room?.conn?.open?"CONNECTED":"CONNECTING"}</span><button class="ghost-btn" id="nextRound" hidden>NEXT ROUND</button></div></div><div class="player-card"><div class="player-name">${s.role==="host"?(s.match?.names?.guest||"PLAYER 2"):(s.match?.names?.host||"PLAYER 1")}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA + MICROPHONE</div><h2>ALLOW CAMERA + MIC</h2><p>Both players are connected. Allow CubeClash to use your camera and microphone for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA + MIC</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA + MIC</button></div></div></div></div>`);
   requestAnimationFrame(()=>{render2DScramble();setTimeout(render2DScramble,60);});
   if(s.localStream){const lv=document.querySelector("#localVideo");if(lv)lv.srcObject=s.localStream}
   if(s.remoteStream){const rv=document.querySelector("#remoteVideo");if(rv)rv.srcObject=s.remoteStream}
@@ -173,31 +173,42 @@ function renderMatch(preconnect=false){
 function isMobileTimer(){return window.matchMedia?.("(pointer:coarse)").matches||window.innerWidth<=760}
 function bindMatchTimer(){
   const zone=document.querySelector("#matchTimerZone"); if(!zone)return;
+  if(window._cubeClashMatchKeyHandler){document.removeEventListener("keydown",window._cubeClashMatchKeyHandler,true);window._cubeClashMatchKeyHandler=null}
   zone.tabIndex=0;
+  zone.setAttribute("role","button");
+  zone.setAttribute("aria-label","Multiplayer timer");
   let downAt=0,longTimer=0,longFired=false;
   const mobile=isMobileTimer();
+  const startPointer=()=>{
+    downAt=performance.now(); longFired=false; clearTimeout(longTimer);
+    if(mobile){
+      longTimer=setTimeout(()=>{
+        longFired=true;
+        if(s.matchPhase==="inspection")matchStart();
+      },650);
+    }
+  };
+  const endPointer=()=>{
+    clearTimeout(longTimer);
+    const held=performance.now()-downAt;
+    if(longFired)return;
+    if(s.matchPhase==="ready"||s.matchPhase==="finished")matchInspection();
+    else if(s.matchPhase==="solving")matchFinish();
+    else if(s.matchPhase==="inspection" && mobile && held<650)toast("LONG PRESS TO START SOLVE");
+  };
   if(mobile){
-    zone.onpointerdown=e=>{
-      e.preventDefault();
-      downAt=performance.now(); longFired=false; clearTimeout(longTimer);
-      longTimer=setTimeout(()=>{longFired=true;if(s.matchPhase==="inspection")matchStart()},600);
-    };
-    zone.onpointerup=e=>{
-      e.preventDefault(); clearTimeout(longTimer);
-      if(longFired)return;
-      const held=performance.now()-downAt;
-      if(s.matchPhase==="ready"||s.matchPhase==="finished")matchInspection();
-      else if(s.matchPhase==="solving")matchFinish();
-      else if(s.matchPhase==="inspection"&&held<600)toast("LONG PRESS TO START SOLVE");
-    };
-    zone.onpointerleave=()=>clearTimeout(longTimer);
-    zone.onpointercancel=()=>clearTimeout(longTimer);
+    zone.addEventListener("pointerdown",e=>{e.preventDefault();startPointer()},{passive:false});
+    zone.addEventListener("pointerup",e=>{e.preventDefault();endPointer()},{passive:false});
+    zone.addEventListener("pointercancel",()=>clearTimeout(longTimer));
+  }else{
+    zone.addEventListener("click",e=>{e.preventDefault();matchToggle()});
   }
   const keyHandler=e=>{
-    if(mobile)return;
+    if(isMobileTimer())return;
     if(!document.querySelector("#matchTimerZone"))return;
     if((e.code==="Space"||e.code==="Enter")&&!e.repeat){
-      e.preventDefault(); e.stopPropagation(); matchToggle();
+      e.preventDefault(); e.stopPropagation(); e.stopImmediatePropagation();
+      matchToggle();
     }
   };
   document.addEventListener("keydown",keyHandler,true);
@@ -226,7 +237,7 @@ function matchStart(){
   matchLoop(); updateMatchUI();
 }
 function matchToggle(){if(s.matchPhase==="ready"||s.matchPhase==="finished")matchInspection();else if(s.matchPhase==="inspection")matchStart();else if(s.matchPhase==="solving")matchFinish()}
-function matchLoop(){cancelAnimationFrame(s.matchRaf);const tick=()=>{const now=performance.now();if(s.matchPhase==="inspection"){const ms=Math.max(0,(s.match?.inspection||15)*1000-(now-s.matchInspectionStart));setMatchTimer(ms,"INSPECTION");}else if(s.matchPhase==="solving"){setMatchTimer(now-s.matchSolveStart,"SOLVING");}else{return} s.matchRaf=requestAnimationFrame(tick)};tick()}
+function matchLoop(){cancelAnimationFrame(s.matchRaf);const tick=()=>{const now=performance.now();if(s.matchPhase==="inspection"){const ms=Math.max(0,(Number.isFinite(Number(s.match?.inspection))?Number(s.match.inspection):15)*1000-(now-s.matchInspectionStart));setMatchTimer(ms,"INSPECTION");}else if(s.matchPhase==="solving"){setMatchTimer(now-s.matchSolveStart,"SOLVING");}else{return} s.matchRaf=requestAnimationFrame(tick)};tick()}
 function setMatchTimer(ms,label){const a=document.querySelector("#matchMainTimer");if(a)a.textContent=fmt(ms);const b=document.querySelector("#matchMainLabel");if(b)b.textContent=label;const c=document.querySelector("#myTimer");if(c)c.textContent=fmt(ms)}
 function matchFinish(){
   if(s.matchPhase!=="solving")return; cancelAnimationFrame(s.matchRaf); const ms=performance.now()-s.matchSolveStart; s.matchPhase="finished";
