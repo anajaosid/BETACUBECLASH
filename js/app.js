@@ -22,86 +22,123 @@ function tutorial(){v(`<div class="tutorial-screen"><div class="tutorial-card"><
 function dashboard(){v(`<div class="hero"><div class="hero-grid"><div><div class="section-title"><small>01 / SPEEDCUBING PLATFORM</small><small>BETA</small></div><h1 class="hero-title cube-font">CUBE<span>CLASH</span></h1><p class="hero-copy">A smooth responsive 2×2 and 3×3 speedcubing timer with random-state scrambles, real 3D scramble visualization, local history, installable PWA support, and peer-to-peer 1v1 rooms.</p><div class="hero-actions"><button class="primary-btn" data-view="solo">SOLO TIMER</button><button class="ghost-btn" data-view="room">CREATE / JOIN 1V1</button></div></div><div class="technical-card"><div class="spec-list"><div class="spec"><span>PUZZLES</span><span>2×2 / 3×3</span></div><div class="spec"><span>SCRAMBLES</span><span>RANDOM-STATE</span></div><div class="spec"><span>SYNC</span><span>WEBRTC P2P</span></div><div class="spec"><span>STORAGE</span><span>INDEXEDDB</span></div><div class="spec"><span>INSTALL</span><span>PWA</span></div></div></div></div></div>`)}
 function home(){v(`<div class="menu-screen"><div class="menu-wrap"><section class="menu-main"><div class="menu-content"><div class="menu-kicker">WELCOME / CUBECLASH BETA</div><h1 class="menu-title">CUBE<span>CLASH</span></h1><p class="menu-sub">A competitive speedcubing platform for 2×2 and 3×3. Choose your appearance, then enter the timer or a 1v1 room.</p><div class="menu-actions"><button class="menu-action" data-view="solo"><span>SOLO TIMER</span><span class="arrow">→</span></button><button class="menu-action" data-view="room"><span>CREATE / JOIN 1V1</span><span class="arrow">→</span></button><button class="menu-action" data-view="settings"><span>SETTINGS</span><span class="arrow">→</span></button></div></div></section>${themePanel()}</div></div>`);bindTheme();applyTheme(savedTheme||"dark")}
 
-function room(){v(`<div class="room-page"><div class="section-title"><h1>1V1 ROOM</h1><small>DEVICE ↔ DEVICE / WEBRTC</small></div><div class="room-layout"><div class="room-card"><h2>CREATE ROOM</h2><div class="form-grid"><div class="field"><label>PUZZLE</label><select id="rp"><option value="333">3×3</option><option value="222">2×2</option></select></div><div class="field"><label>ROUNDS</label><select id="rr"><option>3</option><option selected>5</option><option>7</option></select></div><div class="field"><label>INSPECTION</label><select id="ri"><option>15</option><option>10</option><option>0</option></select></div><div class="field"><label>FORMAT</label><select id="rf"><option>FIRST TO</option><option>BEST OF</option></select></div></div><div class="checks"><label class="check"><input id="rp2" type="checkbox" checked> +2</label><label class="check"><input id="rdnf" type="checkbox" checked> DNF</label></div><button class="primary-btn" id="create">CREATE ROOM</button></div><div class="room-card"><h2>JOIN / CONNECT</h2><p style="color:#666;font-size:12px;line-height:1.6">For this beta, the two browsers exchange one offer and one answer. After that, the actual match traffic is peer-to-peer.</p><div class="field"><label>OFFER / ANSWER LINK</label><textarea class="code-box" id="conn" placeholder="Paste the connection link or encoded data here"></textarea></div><div class="room-actions"><button class="primary-btn" id="join">JOIN OFFER</button><button class="ghost-btn" id="answer">APPLY ANSWER</button></div></div></div><div id="rs" class="empty">NO ACTIVE ROOM</div></div>`);document.querySelector("#create").onclick=createRoom;document.querySelector("#join").onclick=join;document.querySelector("#answer").onclick=apply}
-function showRoom(t,l=""){const e=document.querySelector("#rs");e.className="room-card";e.innerHTML=`<h2>${esc(t)}</h2>${l?`<textarea readonly class="code-box room-link" id="roomLink">${esc(l)}</textarea><div class="room-actions"><button class="primary-btn" id="copyLink">COPY LINK</button></div>`:""}`;document.querySelector("#copyLink")?.addEventListener("click",async()=>{const ok=await navigator.clipboard?.writeText(l).then(()=>true).catch(()=>false);if(!ok){const a=document.querySelector("#roomLink");a.focus();a.select();document.execCommand("copy")}toast("LINK COPIED")})}
+function room(){
+  v(`<div class="room-page"><div class="section-title"><h1>1V1 ROOM</h1><small>LIVE WEBRTC / PEER-TO-PEER</small></div><div class="room-layout"><div class="room-card"><h2>CREATE ROOM</h2><p class="room-help">Create a room and share the short room code. Keep this page open until your opponent joins.</p><div class="form-grid"><div class="field"><label>PUZZLE</label><select id="rp"><option value="333">3×3</option><option value="222">2×2</option></select></div><div class="field"><label>ROUNDS</label><select id="rr"><option>3</option><option selected>5</option><option>7</option></select></div><div class="field"><label>INSPECTION</label><select id="ri"><option>15</option><option>10</option><option>0</option></select></div><div class="field"><label>FORMAT</label><select id="rf"><option>FIRST TO</option><option>BEST OF</option></select></div></div><div class="checks"><label class="check"><input id="rp2" type="checkbox" checked> +2</label><label class="check"><input id="rdnf" type="checkbox" checked> DNF</label></div><button class="primary-btn" id="create">CREATE ROOM</button><div id="hostRoom" class="room-code-box" hidden></div></div><div class="room-card"><h2>JOIN ROOM</h2><p class="room-help">Enter the room code shown by Player 1. No offer/answer strings are needed.</p><div class="field"><label>ROOM CODE</label><input id="roomCode" class="code-input" autocomplete="off" autocapitalize="characters" placeholder="e.g. A7K9P2QX"></div><button class="primary-btn" id="join">JOIN ROOM</button></div></div><div id="rs" class="empty">NO ACTIVE ROOM</div></div>`);
+  document.querySelector("#create").onclick=createRoom;
+  document.querySelector("#join").onclick=joinRoom;
+}
+function showRoomStatus(title,body="",kind=""){
+  const e=document.querySelector("#rs");
+  if(!e)return;
+  e.className=`room-card ${kind}`;
+  e.innerHTML=`<h2>${esc(title)}</h2>${body?`<p class="room-help">${esc(body)}</p>`:""}`;
+}
+function makeRoomCode(id){return id.slice(-8).toUpperCase()}
 async function createRoom(){
   try{
     s.role="host";
     s.puzzle=document.querySelector("#rp").value;
     s.match={rounds:+document.querySelector("#rr").value,inspection:+document.querySelector("#ri").value,format:document.querySelector("#rf").value,allowPlus2:document.querySelector("#rp2").checked,allowDNF:document.querySelector("#rdnf").checked,round:1,score:[0,0],status:"WAITING",scramble:""};
-    s.room=new P2PRoom();
+    s.room=new P2PRoom("host");
     wireRoom();
-    showRoom("CREATING ROOM","Generating WebRTC offer… please wait a few seconds.");
-    const offer=await s.room.createOffer();
-    const share=link("offer",offer);
-    showRoom("ROOM CREATED",share);
-    toast("ROOM LINK GENERATED");
-  }catch(err){
-    console.error("CubeClash create room error:",err);
-    showRoom("ROOM CREATION FAILED",String(err?.message||err));
-    toast("CREATE ROOM FAILED");
-  }
+    showRoomStatus("CREATING ROOM","Connecting to the room service…");
+    const peerId=await s.room.createRoom();
+    s.roomCode=makeRoomCode(peerId);
+    const hostBox=document.querySelector("#hostRoom");
+    if(hostBox){hostBox.hidden=false;hostBox.innerHTML=`<div class="room-code-label">ROOM CODE</div><div class="room-code">${esc(s.roomCode)}</div><button class="ghost-btn" id="copyRoomCode">COPY CODE</button>`;document.querySelector("#copyRoomCode").onclick=()=>copyText(s.roomCode)}
+    showRoomStatus("ROOM READY","Give the room code to Player 2. Waiting for the connection…");
+    toast("ROOM CREATED");
+  }catch(err){console.error(err);showRoomStatus("ROOM CREATION FAILED",err.message||String(err),"error");toast("CREATE ROOM FAILED")}
 }
-function payload(raw){
-  const value=raw.trim();
+async function joinRoom(){
   try{
-    if(value.startsWith("http://")||value.startsWith("https://")){
-      const u=new URL(value);
-      const eq=u.hash.indexOf("=");
-      return eq>=0?decodeURIComponent(u.hash.slice(eq+1)):value;
-    }
-  }catch{}
-  return value.includes("=")?decodeURIComponent(value.slice(value.indexOf("=")+1)):value;
-}
-async function join(){
-  try{
-    const value=payload(document.querySelector("#conn").value);
-    if(!value)throw new Error("Paste a Player 1 offer link first.");
+    const code=(document.querySelector("#roomCode")?.value||"").trim();
+    if(!code)throw new Error("Enter the room code first.");
     s.role="guest";
-    s.room=new P2PRoom();
+    s.room=new P2PRoom("guest");
     wireRoom();
-    showRoom("CONNECTING","Reading Player 1 offer…");
-    const answer=await s.room.acceptOffer(value);
-    const share=link("answer",answer);
-    showRoom("ANSWER READY — SEND THIS BACK TO PLAYER 1",share);
-    toast("ANSWER LINK GENERATED");
-  }catch(err){
-    console.error("CubeClash join error:",err);
-    showRoom("JOIN FAILED",String(err?.message||err));
-    toast("JOIN FAILED");
-  }
+    showRoomStatus("CONNECTING",`Looking for room ${code.toUpperCase()}…`);
+    const ok=await s.room.joinRoom(code);
+    if(ok){showRoomStatus("CONNECTED","Waiting for the host to send the match setup…");toast("PLAYER 1 CONNECTED")}
+  }catch(err){console.error(err);showRoomStatus("JOIN FAILED",err.message||String(err),"error");toast("JOIN FAILED")}
 }
-async function apply(){
-  try{
-    const value=payload(document.querySelector("#conn").value);
-    if(!s.room)throw new Error("This browser does not have the Player 1 room open. Create the room again here, then apply Player 2's answer.");
-    await s.room.acceptAnswer(value);
-    showRoom("CONNECTING","Waiting for Player 2…");
-    toast("ANSWER APPLIED");
-  }catch(err){
-    console.error("CubeClash answer error:",err);
-    toast("ANSWER FAILED");
-  }
+function copyText(text){
+  navigator.clipboard?.writeText(text).then(()=>toast("COPIED")).catch(()=>{const a=document.createElement("textarea");a.value=text;document.body.appendChild(a);a.select();document.execCommand("copy");a.remove();toast("COPIED")});
 }
 function wireRoom(){
+  if(s.room._wired)return; s.room._wired=true;
   s.room.on("state",state=>{
-    const e=document.querySelector("#rs");
-    if(e&&state) e.innerHTML=`<h2>CONNECTION: ${esc(String(state).toUpperCase())}</h2><p style="color:#777;font:500 11px var(--mono)">CONNECTION ACTIVE · ROOM HOSTED IN THIS TAB</p>`;
-    if(state==="connected"&&s.role==="host"){
-      (async()=>{
-        if(!s.scramble)s.scramble=await scr();
+    console.log("CubeClash room state",state);
+    if(state==="connected"){
+      if(s.role==="host"){
+        if(!s.scramble) s.scramble=randomScramble();
         const config={type:"match-config",match:{...s.match,puzzle:s.puzzle},scramble:s.scramble};
-        s.room.send(config);
-        toast("PLAYER 2 CONNECTED");
-      })().catch(err=>console.error("match sync error",err));
+        try{s.room.send(config)}catch(e){console.error(e)}
+      }
+      showCameraPermission();
     }
+    if(state==="closed")showRoomStatus("PLAYER DISCONNECTED","The peer connection closed.","error");
+    if(state==="signaling-disconnected")showRoomStatus("SIGNALING DISCONNECTED","The room service connection was lost. Existing P2P connections may continue.","error");
+  }).on("state",state=>{
+    if(state==="camera-requested"&&s.localStream&&s.role==="guest"){try{s.room.answerWithCamera(s.localStream)}catch(e){console.error(e)}}
   }).on("message",msg=>{
+    if(!msg||typeof msg!=="object")return;
     if(msg.type==="match-config"&&s.role==="guest"){
-      s.match=msg.match;s.puzzle=msg.match.puzzle;s.scramble=msg.scramble||"";
+      s.match=msg.match;s.puzzle=msg.match.puzzle;s.scramble=msg.scramble||randomScramble();
+      renderMatch();
       toast("MATCH READY");
     }
-  }).on("error",err=>console.error("CubeClash WebRTC error:",err));
+    if(msg.type==="camera-ready"){s.remoteCameraReady=true;}
+    if(msg.type==="camera-ready"&&s.role==="host"&&s.localStream){
+      if(!s.cameraCallStarted){s.cameraCallStarted=true;s.room.startCameraCall(s.localStream).catch(e=>console.error(e))}
+    }
+    if(msg.type==="timer-start")setOpponentState("SOLVING",msg.startedAt);
+    if(msg.type==="timer-inspection")setOpponentState("INSPECTION",msg.startedAt);
+    if(msg.type==="timer-finish"){
+      s.opponent.status=msg.display||"FINISHED";s.opponent.time=msg.display||"—";updateMatchUI();
+      if(s.role==="host"&&msg.display!=="DNF")s.match.score[1]+=1;
+    }
+    if(msg.type==="match-reset")renderMatch();
+  }).on("stream",stream=>{
+    s.remoteStream=stream;const v=document.querySelector("#remoteVideo");if(v){v.srcObject=stream;v.play().catch(()=>{})}
+    updateCameraState("OPPONENT CAMERA CONNECTED");
+  }).on("error",err=>{console.error("CubeClash P2P error",err);toast(err.message||String(err));});
+  if(s.room.peer)s.room.peer.on("connection",()=>{});
 }
+async function showCameraPermission(){
+  renderMatch(true);
+  const modal=document.querySelector("#cameraModal");if(!modal)return;
+  modal.hidden=false;
+  document.querySelector("#allowCamera").onclick=async()=>{
+    try{
+      s.localStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:"user",width:{ideal:640},height:{ideal:480}},audio:false});
+      const local=document.querySelector("#localVideo");if(local){local.srcObject=s.localStream;local.play().catch(()=>{})}
+      modal.hidden=true;updateCameraState("CAMERA READY");
+      if(s.room.call&&s.role==="guest"){try{s.room.answerWithCamera(s.localStream)}catch(e){console.error(e)}}
+      s.room.send({type:"camera-ready"});
+      if(s.role==="host"&&s.room.conn?.peer&&s.remoteCameraReady&&!s.cameraCallStarted){s.cameraCallStarted=true;s.room.startCameraCall(s.localStream).catch(e=>console.error(e))}
+    }catch(err){modal.hidden=true;updateCameraState("CAMERA BLOCKED — ALLOW CAMERA IN BROWSER SETTINGS");toast("CAMERA PERMISSION DENIED")}
+  };
+  document.querySelector("#skipCamera").onclick=()=>{modal.hidden=true;updateCameraState("CAMERA OFF")};
+}
+function renderMatch(preconnect=false){
+  v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?"PLAYER 1 / HOST":"PLAYER 2 / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${s.match?.round||1}</span><span id="matchScore">${s.match?.score?.[0]||0} — ${s.match?.score?.[1]||0}</span><button class="ghost-btn" data-view="home">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">CAMERA WAITING</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?"PLAYER 1":"PLAYER 2"}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div class="match-controls"><button class="primary-btn" id="matchStart">START</button><button class="ghost-btn" id="matchDone">FINISH</button></div></div><div class="center-match"><div class="center-scramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div><div class="center-cube">${cube()}</div><div class="match-controls"><span class="match-connection" id="matchConnection">${preconnect?"CONNECTING":"CONNECTED"}</span></div></div><div class="player-card"><div class="player-name">${s.role==="host"?"PLAYER 2":"PLAYER 1"}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA</div><h2>ALLOW CAMERA</h2><p>Both players are connected. Allow CubeClash to use your camera for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA</button></div></div></div></div>`);
+  mountCube();
+  if(s.localStream){const v=document.querySelector("#localVideo");if(v)v.srcObject=s.localStream}
+  if(s.remoteStream){const v=document.querySelector("#remoteVideo");if(v)v.srcObject=s.remoteStream}
+  document.querySelector("#matchStart").onclick=matchStart;
+  document.querySelector("#matchDone").onclick=matchFinish;
+  window.onkeydown=e=>{if((e.code==="Space"||e.code==="Enter")&&!e.repeat){e.preventDefault();matchToggle()}};
+  updateCameraState(s.localStream?"CAMERA READY":"CAMERA WAITING");
+}
+function updateCameraState(text){const e=document.querySelector("#localCamState");if(e)e.textContent=text}
+function setOpponentState(status,time){s.opponent.status=status;if(time)s.opponent.startedAt=time;updateMatchUI()}
+function updateMatchUI(){const t=document.querySelector("#oppTimer"),st=document.querySelector("#oppState");if(t)t.textContent=s.opponent.time||"0.00";if(st)st.textContent=s.opponent.status||"WAITING";const sc=document.querySelector("#matchScore");if(sc)sc.textContent=`${s.match?.score?.[0]||0} — ${s.match?.score?.[1]||0}`}
+function matchStart(){if(s.matchPhase&&s.matchPhase!=="ready")return;s.matchPhase="solving";s.matchSolveStart=performance.now();s.room?.send({type:"timer-start",startedAt:Date.now()});document.querySelector("#myState").textContent="SOLVING";matchLoop()}
+function matchToggle(){if(s.matchPhase==="solving")matchFinish();else matchStart()}
+function matchLoop(){if(s.matchPhase!=="solving")return;const ms=performance.now()-s.matchSolveStart;const e=document.querySelector("#myTimer");if(e)e.textContent=fmt(ms);s.matchRaf=requestAnimationFrame(matchLoop)}
+function matchFinish(){if(s.matchPhase!=="solving")return;cancelAnimationFrame(s.matchRaf);const ms=performance.now()-s.matchSolveStart;s.matchPhase="finished";const display=fmt(ms);s.opponent.self=display;const e=document.querySelector("#myTimer");if(e)e.textContent=display;const st=document.querySelector("#myState");if(st)st.textContent="FINISHED";try{s.room?.send({type:"timer-finish",display})}catch{}if(s.role==="host"){s.match.score[0]+=1;updateMatchUI()}}
+
 function settingsView(){v(`<div class="section-title"><h1>SETTINGS</h1><small>LOCAL DEVICE</small></div><div class="settings-grid"><div class="setting-card"><h2>APPEARANCE</h2><div class="theme-options" style="margin-top:14px"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div></div><div class="setting-card"><h2>TIMER</h2><div class="field"><label>INSPECTION SECONDS</label><select id="ins"><option ${settings.inspection===0?"selected":""}>0</option><option ${settings.inspection===10?"selected":""}>10</option><option ${settings.inspection===15?"selected":""}>15</option></select></div><div class="room-actions"><button class="primary-btn" id="save">SAVE SETTINGS</button></div></div><div class="setting-card"><h2>DATA</h2><p style="color:#666;font-size:12px;line-height:1.6">Solves are stored locally in IndexedDB. Export before clearing browser data or changing devices.</p><div class="room-actions"><button class="ghost-btn" id="ex">EXPORT JSON</button><label class="ghost-btn" style="display:grid;place-items:center;cursor:pointer">IMPORT JSON<input id="im" type="file" accept=".json" hidden></label><button class="danger-btn" id="cl">CLEAR SOLVES</button></div></div></div>`);bindTheme();applyTheme(localStorage.getItem("cubeclash-theme")||"dark");document.querySelector("#save").onclick=()=>{settings.inspection=+document.querySelector("#ins").value;localStorage.setItem("cubeclash-settings",JSON.stringify(settings));toast("SETTINGS SAVED")};document.querySelector("#ex").onclick=async()=>{const b=new Blob([JSON.stringify(await exportData(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`cubeclash-${Date.now()}.json`;a.click()};document.querySelector("#im").onchange=async e=>{try{await importData(JSON.parse(await e.target.files[0].text()));toast("DATA IMPORTED")}catch{toast("IMPORT FAILED")}};document.querySelector("#cl").onclick=async()=>{if(confirm("Clear all local solves?")){await clearSolves();toast("SOLVES CLEARED")}}}
 async function nav(x){if(x==="home")home();if(x==="solo")await solo();if(x==="room")room();if(x==="settings")settingsView()}document.addEventListener("click",e=>{const x=e.target.closest("[data-view]");if(x)nav(x.dataset.view)});window.addEventListener("online",()=>{document.querySelector("#networkText").textContent="ONLINE"});window.addEventListener("offline",()=>{document.querySelector("#networkText").textContent="OFFLINE"});window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;document.querySelector("#installBtn").hidden=false});document.querySelector("#installBtn").onclick=async()=>{if(deferredInstall){await deferredInstall.prompt();deferredInstall=null}};if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("./service-worker.js");if(localStorage.getItem("cubeclash-tutorial-seen")==="1")home();else tutorial();
 if(location.hash){
