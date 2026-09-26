@@ -8,6 +8,14 @@ The beta generates practice scrambles locally. The 3D visualization uses the exa
 
 For official WCA competition scrambling, always use the current official WCA scramble program; CubeClash is intended for practice and online play.
 
+## Run
+
+```bash
+python3 -m http.server 8080
+```
+
+Open `http://localhost:8080`.
+
 For GitHub Pages, upload the project and enable Pages. HTTPS is required for normal WebRTC/PWA behavior.
 
 ## PWA
