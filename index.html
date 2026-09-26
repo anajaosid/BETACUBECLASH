@@ -16,13 +16,13 @@
 window.addEventListener("error",function(e){
   const app=document.getElementById("app");
   if(app&&!app.dataset.started){
-    app.innerHTML='<div class="startup-error"><strong>CUBECLASH COULD NOT LOAD</strong><span>Refresh the page. If this keeps happening, use a private window or clear the site cache.</span><button onclick="location.reload()">RELOAD</button></div>';
+    app.innerHTML='<div class="startup-error"><strong>CUBECLASH COULD NOT LOAD</strong><span>The app code failed to start. See the browser console for the exact error.</span><button onclick="location.reload()">RELOAD</button></div>';
   }
 });
 window.addEventListener("unhandledrejection",function(e){
   const app=document.getElementById("app");
   if(app&&!app.dataset.started){
-    app.innerHTML='<div class="startup-error"><strong>CUBECLASH COULD NOT LOAD</strong><span>Refresh the page. If this keeps happening, use a private window or clear the site cache.</span><button onclick="location.reload()">RELOAD</button></div>';
+    app.innerHTML='<div class="startup-error"><strong>CUBECLASH COULD NOT LOAD</strong><span>The app code failed to start. See the browser console for the exact error.</span><button onclick="location.reload()">RELOAD</button></div>';
   }
 });
 </script>
