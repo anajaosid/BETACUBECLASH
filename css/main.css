@@ -132,3 +132,8 @@ body{letter-spacing:normal}
 .round-result-title{font-size:10px;letter-spacing:.18em;font-weight:800}
 .round-result-player{padding:14px 12px;border:1px solid var(--line);border-radius:10px;background:rgba(127,127,127,.04)}
 .round-result-difference{padding:8px 10px;border:1px dashed var(--line2);border-radius:8px}
+
+/* v33: reliable physical sticker colors + persistent multiplayer round history */
+.cube3d .cube-sticker-R{background:#d71920!important}.cube3d .cube-sticker-O{background:#ff6a00!important}.cube3d .cube-sticker-W{background:#f7f7f7!important}.cube3d .cube-sticker-Y{background:#ffd500!important}.cube3d .cube-sticker-G{background:#009b48!important}.cube3d .cube-sticker-B{background:#0051ba!important}
+.round-history-list{display:grid;gap:10px}.round-history-card{border:1px solid var(--line2);border-radius:12px;padding:14px;background:rgba(127,127,127,.045)}.round-history-head{display:flex;justify-content:space-between;gap:10px;color:var(--muted);font:700 9px var(--sans);letter-spacing:.08em;margin-bottom:10px}.round-history-players{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:12px}.round-history-name{font:700 10px var(--sans);color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.round-history-time{font:700 clamp(22px,3vw,34px) var(--mono)}.round-history-players>div:last-child{text-align:right}.round-history-diff{border:1px dashed var(--line2);border-radius:8px;padding:7px 9px;text-align:center;font:700 9px var(--mono);color:var(--muted);white-space:nowrap}
+@media(max-width:600px){.round-history-players{gap:7px}.round-history-time{font-size:21px}.round-history-diff{font-size:8px;padding:6px}.round-history-name{font-size:9px}}
