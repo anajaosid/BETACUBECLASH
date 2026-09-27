@@ -10,7 +10,7 @@ const toast=x=>{toastEl.textContent=x;toastEl.classList.add("show");clearTimeout
 const CUBE_COLORS={R:"R",L:"O",U:"W",D:"Y",F:"G",B:"B"};
 const MOVE_AXIS={R:"x",L:"x",U:"y",D:"y",F:"z",B:"z"};
 const MOVE_LAYER={R:1,L:-1,U:1,D:-1,F:1,B:-1};
-const MOVE_SIGN={R:-1,L:1,U:1,D:-1,F:-1,B:1};
+const MOVE_SIGN={R:-1,L:1,U:1,D:-1,F:1,B:-1};
 const COLOR_HEX={R:"#d71920",O:"#ff6a00",W:"#f7f7f7",Y:"#ffd500",G:"#009b48",B:"#0051ba"};
 
 function randomInt(max){return Math.floor(Math.random()*max)}
@@ -45,7 +45,7 @@ function randomScramble(){
 }
 
 async function scr(){s.scramble=randomScramble();return s.scramble}
-function cube(){const moves=s.scramble.trim().split(/\s+/).filter(Boolean);const speed=Math.max(.25,Math.min(2,Number(settings.scrambleSpeed)||1));return `<div class="cube3d-wrap cube-player-wrap"><div class="cube-follow-head"><span>FOLLOW THE SCRAMBLE</span><span>WHITE TOP · GREEN FRONT</span></div><div class="cube3d" id="cube3d" data-puzzle="${s.puzzle}" data-scramble="${esc(s.scramble)}"></div><div class="cube-move-label" id="scrambleMoveLabel">START / SOLVED</div><div class="scramble-speed"><div class="scramble-speed-head"><span>SCRAMBLE SPEED</span><strong id="scrambleSpeedValue">${speed.toFixed(2)}×</strong></div><input id="scrambleSpeed" type="range" min="0.25" max="2" step="0.25" value="${speed}" aria-label="Scramble animation speed"><div class="scramble-speed-scale"><span>SLOW · NEWBIE</span><span>FAST</span></div></div><div class="cube-follow-foot"><span>${moves.length} MOVES · WATCH EACH TURN</span><button class="ghost-btn" id="replayScramble">REPLAY SCRAMBLE</button></div></div>`}
+function cube(){const moves=s.scramble.trim().split(/\s+/).filter(Boolean);const speed=Math.max(.05,Math.min(2,Number(settings.scrambleSpeed)||1));return `<div class="cube3d-wrap cube-player-wrap"><div class="cube-follow-head"><span>FOLLOW THE SCRAMBLE</span><span>WHITE TOP · GREEN FRONT</span></div><div class="cube3d" id="cube3d" data-puzzle="${s.puzzle}" data-scramble="${esc(s.scramble)}"></div><div class="cube-move-label" id="scrambleMoveLabel">START / SOLVED</div><div class="scramble-speed"><div class="scramble-speed-head"><span>SCRAMBLE SPEED</span><strong id="scrambleSpeedValue">${speed.toFixed(2)}×</strong></div><input id="scrambleSpeed" type="range" min="0.05" max="2" step="0.05" value="${speed}" aria-label="Scramble animation speed"><div class="scramble-speed-scale"><span>SLOW · NEWBIE</span><span>FAST</span></div></div><div class="cube-follow-foot"><span>${moves.length} MOVES · WATCH EACH TURN</span><button class="ghost-btn" id="replayScramble">REPLAY SCRAMBLE</button></div></div>`}
 
 function rotateVector(v,axis,quarterTurns){
   let [x,y,z]=v;
@@ -193,7 +193,7 @@ function renderCube(root=document.querySelector("#cube3d"),state=buildCubeState(
   return root.querySelector(size===2?".cube-model-222":".cube-model-333");
 }
 
-function cubeMoveDuration(){const base=s.puzzle==="222"?260:220;const speed=Math.max(.25,Math.min(2,Number(settings.scrambleSpeed)||1));return Math.round(base/speed)}
+function cubeMoveDuration(){const base=s.puzzle==="222"?260:220;const speed=Math.max(.05,Math.min(2,Number(settings.scrambleSpeed)||1));return Math.round(base/speed)}
 function cubeMoveAngle(token, quarterSignOverride=null){
   const face=token[0];
   const sign=MOVE_SIGN[face]*(token.includes("'")?-1:1);
@@ -231,38 +231,50 @@ function animateOwnScramble(){
   const play=async()=>{
     if(runId!==s.scrambleRunId)return;
     renderCube(root,buildSolvedCubeState(size));
-    let currentModel=root.querySelector(size===2?".cube-model-222":".cube-model-333");
     if(moveLabel)moveLabel.textContent="START / SOLVED";
     if(replay)replay.disabled=true;
-    let completed=0;
+    await new Promise(r=>setTimeout(r,220));
     for(let i=0;i<tokens.length;i++){
       if(runId!==s.scrambleRunId)return;
       const token=tokens[i];
-      const quarters=tokenQuarterMoves(token);
-      for(let q=0;q<quarters.length;q++){
+      const quarters=token.endsWith("2")?2:1;
+      const direction=token.includes("'")?-1:1;
+      for(let q=0;q<quarters;q++){
         if(runId!==s.scrambleRunId)return;
-        const {face,direction}=quarters[q];
-        const stateTokens=applyQuarterToTokens(tokens,i,face,direction,q);
-        const before=buildCubeState(size,stateTokens);
-        const afterTokens=applyQuarterToTokens(tokens,i,face,direction,q+1);
-        const after=buildCubeState(size,afterTokens);
-        const axis=MOVE_AXIS[face],layer=MOVE_LAYER[face],idx=axis==="x"?0:axis==="y"?1:2;
-        const angle=cubeMoveAngle(token,direction);
-        if(moveLabel)moveLabel.textContent=`MOVE ${i+1} / ${tokens.length} · ${token}${quarters.length===2?` · TURN ${q+1}/2`:""}`;
-        [...currentModel.children].forEach((piece,index)=>{
+        const single=direction===1?token[0]:`${token[0]}'`;
+        const completedTokens=tokens.slice(0,i);
+        const beforeTokens=[...completedTokens,...Array.from({length:q},()=>single)];
+        const afterTokens=[...completedTokens,...Array.from({length:q+1},()=>single)];
+        const before=buildCubeState(size,beforeTokens.join(" "));
+        const after=buildCubeState(size,afterTokens.join(" "));
+        const axis=MOVE_AXIS[token[0]],layer=MOVE_LAYER[token[0]],idx=axis==="x"?0:axis==="y"?1:2;
+        const rootModel=renderCube(root,before);
+        if(!rootModel)return;
+        const turnGroup=document.createElement("div");
+        turnGroup.className="cube-turn-group";
+        turnGroup.style.cssText="position:absolute;left:0;top:0;width:0;height:0;transform-style:preserve-3d;will-change:transform;";
+        rootModel.appendChild(turnGroup);
+        const pieces=[...rootModel.children].filter(el=>el!==turnGroup);
+        pieces.forEach((piece,index)=>{
           const cubie=before[index];
           if(!cubie||cubie.p[idx]!==layer)return;
-          const cAfter=after[index];
-          const [nx,ny,nz]=cubePosition(cAfter,size);
-          piece.style.transition=`transform ${cubeMoveDuration()}ms cubic-bezier(.2,.7,.2,1)`;
-          piece.style.transform=`translate3d(${nx}px,${ny}px,${nz}px) rotate${axis.toUpperCase()}(${angle.angle}deg)`;
+          const pos=cubePosition(cubie,size);
+          piece.style.transform=`translate3d(${pos[0]}px,${pos[1]}px,${pos[2]}px)`;
+          turnGroup.appendChild(piece);
         });
-        await new Promise(r=>setTimeout(r,cubeMoveDuration()+35));
+        if(moveLabel)moveLabel.textContent=`MOVE ${i+1} / ${tokens.length} · ${token}${quarters===2?` · TURN ${q+1}/2`:""}`;
+        const angle=cubeMoveAngle(token,direction).angle;
+        const duration=cubeMoveDuration();
+        await new Promise(resolve=>{
+          requestAnimationFrame(()=>{
+            turnGroup.style.transition=`transform ${duration}ms cubic-bezier(.2,.7,.2,1)`;
+            turnGroup.style.transform=`rotate${axis.toUpperCase()}(${angle}deg)`;
+            setTimeout(resolve,duration+70);
+          });
+        });
         if(runId!==s.scrambleRunId)return;
         renderCube(root,after);
-        currentModel=root.querySelector(size===2?".cube-model-222":".cube-model-333");
-        completed++;
-        await new Promise(r=>setTimeout(r,45));
+        await new Promise(r=>setTimeout(r,100));
       }
     }
     if(runId===s.scrambleRunId){
@@ -270,10 +282,7 @@ function animateOwnScramble(){
       if(replay)replay.disabled=false;
     }
   };
-  s.replayScramble=()=>{
-    s.scrambleRunId=(s.scrambleRunId||0)+1;
-    animateOwnScramble();
-  };
+  s.replayScramble=()=>{s.scrambleRunId=(s.scrambleRunId||0)+1;animateOwnScramble()};
   play();
 }
 function cubeStateKey(c){return `${c.p.join(",")}:${c.stickers.map(x=>x.normal.join(",")+x.color).sort().join("|")}`}
@@ -333,7 +342,7 @@ function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);documen
   const speedRange=document.querySelector("#scrambleSpeed");
   const speedValue=document.querySelector("#scrambleSpeedValue");
   speedRange?.addEventListener("input",()=>{
-    const value=Math.max(.25,Math.min(2,Number(speedRange.value)||1));
+    const value=Math.max(.05,Math.min(2,Number(speedRange.value)||1));
     settings.scrambleSpeed=value;
     if(speedValue)speedValue.textContent=`${value.toFixed(2)}×`;
     localStorage.setItem("cubeclash-settings",JSON.stringify(settings));
@@ -826,7 +835,7 @@ function resetMatchRound(){
   s.matchPhase="ready";s.matchPenalty="";cancelAnimationFrame(s.matchRaf);cancelAnimationFrame(s.opponentRaf);s.opponent={time:"0.00",status:"WAITING"};s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.matchRawMs=0;s.matchPenalty="";s.nextRoundReady=false;s.remoteNextRoundReady=false;s.advanceRequested=false;s._roundResolved=null;renderMatch(false);
 }
 
-function settingsView(){v(`<div class="section-title"><h1>SETTINGS</h1><small>LOCAL DEVICE</small></div><div class="settings-grid"><div class="setting-card"><h2>APPEARANCE</h2><div class="theme-options" style="margin-top:14px"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div></div><div class="setting-card"><h2>PROFILE</h2><div class="field"><label>DISPLAY NAME</label><input id="displayName" maxlength="24" value="${esc(settings.name||"")}" placeholder="YOUR NAME" autocomplete="nickname"></div><p style="color:#666;font-size:12px;line-height:1.6">Your name is shown to the other player during 1v1 matches.</p></div><div class="setting-card creator-card"><h2>CREATOR</h2><div class="creator-name">SID ANAJAO</div><p>Created and developed by Sid Anajao.</p></div><div class="setting-card"><h2>TIMER</h2><div class="field"><label>SCRAMBLE ANIMATION SPEED</label><input id="scrambleSpeedSetting" type="range" min="0.25" max="2" step="0.25" value="${Math.max(.25,Math.min(2,Number(settings.scrambleSpeed)||1))}"><div class="scramble-speed-scale"><span>SLOW</span><strong id="scrambleSpeedSettingValue">${(Math.max(.25,Math.min(2,Number(settings.scrambleSpeed)||1))).toFixed(2)}×</strong><span>FAST</span></div></div><div class="field"><label>INSPECTION SECONDS</label><select id="ins"><option ${settings.inspection===0?"selected":""}>0</option><option ${settings.inspection===10?"selected":""}>10</option><option ${settings.inspection===15?"selected":""}>15</option></select></div><div class="room-actions"><button class="primary-btn" id="save">SAVE SETTINGS</button></div></div><div class="setting-card"><h2>DATA</h2><p style="color:#666;font-size:12px;line-height:1.6">Solves are stored locally in IndexedDB. Export your times before clearing browser data or moving to another device.</p><div class="room-actions"><button class="ghost-btn" id="ex">EXPORT JSON</button><label class="ghost-btn" style="display:grid;place-items:center;cursor:pointer">IMPORT JSON<input id="im" type="file" accept=".json" hidden></label><button class="danger-btn" id="cl">CLEAR SOLVES</button></div></div><div class="setting-card wipe-card"><h2>RESET / UPDATE</h2><p style="color:#666;font-size:12px;line-height:1.6">Use this when a new CubeClash update is installed and the old service worker or cached files are causing problems. CubeClash will automatically download a JSON backup of your solve history first, then clear local app data, caches, and the service worker.</p><div class="room-actions"><button class="danger-btn" id="wipeAll">EXPORT + WIPE APP DATA</button></div></div></div>`);bindTheme();applyTheme(localStorage.getItem("cubeclash-theme")||"dark");document.querySelector("#scrambleSpeedSetting")?.addEventListener("input",e=>{const value=Math.max(.25,Math.min(2,Number(e.target.value)||1));document.querySelector("#scrambleSpeedSettingValue").textContent=`${value.toFixed(2)}×`});document.querySelector("#save").onclick=()=>{settings.inspection=+document.querySelector("#ins").value;settings.scrambleSpeed=Math.max(.25,Math.min(2,Number(document.querySelector("#scrambleSpeedSetting")?.value)||1));settings.name=(document.querySelector("#displayName")?.value||"").trim().slice(0,24);const selected=document.querySelector(".theme-option.active")?.dataset.theme||currentTheme();applyTheme(selected);localStorage.setItem("cubeclash-settings",JSON.stringify(settings));toast("SETTINGS SAVED")};document.querySelector("#ex").onclick=async()=>{const b=new Blob([JSON.stringify(await exportData(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`cubeclash-${Date.now()}.json`;a.click()};document.querySelector("#im").onchange=async e=>{try{await importData(JSON.parse(await e.target.files[0].text()));toast("DATA IMPORTED")}catch{toast("IMPORT FAILED")}};document.querySelector("#cl").onclick=async()=>{if(confirm("Clear all local solves? This cannot be undone unless you exported them.")){await clearSolves();toast("SOLVES CLEARED")}};document.querySelector("#wipeAll").onclick=async()=>{if(!confirm("CubeClash will export your solve history and then clear local app data, cache, settings, and service worker. Continue?"))return;try{await wipeCubeClashData({downloadBackup:true});alert("Backup downloaded. CubeClash will reload with a clean installation.");location.reload()}catch(e){console.error(e);toast("RESET FAILED")}}}
+function settingsView(){v(`<div class="section-title"><h1>SETTINGS</h1><small>LOCAL DEVICE</small></div><div class="settings-grid"><div class="setting-card"><h2>APPEARANCE</h2><div class="theme-options" style="margin-top:14px"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div></div><div class="setting-card"><h2>PROFILE</h2><div class="field"><label>DISPLAY NAME</label><input id="displayName" maxlength="24" value="${esc(settings.name||"")}" placeholder="YOUR NAME" autocomplete="nickname"></div><p style="color:#666;font-size:12px;line-height:1.6">Your name is shown to the other player during 1v1 matches.</p></div><div class="setting-card creator-card"><h2>CREATOR</h2><div class="creator-name">SID ANAJAO</div><p>Created and developed by Sid Anajao.</p></div><div class="setting-card"><h2>TIMER</h2><div class="field"><label>SCRAMBLE ANIMATION SPEED</label><input id="scrambleSpeedSetting" type="range" min="0.05" max="2" step="0.05" value="${Math.max(.05,Math.min(2,Number(settings.scrambleSpeed)||1))}"><div class="scramble-speed-scale"><span>SLOW</span><strong id="scrambleSpeedSettingValue">${(Math.max(.05,Math.min(2,Number(settings.scrambleSpeed)||1))).toFixed(2)}×</strong><span>FAST</span></div></div><div class="field"><label>INSPECTION SECONDS</label><select id="ins"><option ${settings.inspection===0?"selected":""}>0</option><option ${settings.inspection===10?"selected":""}>10</option><option ${settings.inspection===15?"selected":""}>15</option></select></div><div class="room-actions"><button class="primary-btn" id="save">SAVE SETTINGS</button></div></div><div class="setting-card"><h2>DATA</h2><p style="color:#666;font-size:12px;line-height:1.6">Solves are stored locally in IndexedDB. Export your times before clearing browser data or moving to another device.</p><div class="room-actions"><button class="ghost-btn" id="ex">EXPORT JSON</button><label class="ghost-btn" style="display:grid;place-items:center;cursor:pointer">IMPORT JSON<input id="im" type="file" accept=".json" hidden></label><button class="danger-btn" id="cl">CLEAR SOLVES</button></div></div><div class="setting-card wipe-card"><h2>RESET / UPDATE</h2><p style="color:#666;font-size:12px;line-height:1.6">Use this when a new CubeClash update is installed and the old service worker or cached files are causing problems. CubeClash will automatically download a JSON backup of your solve history first, then clear local app data, caches, and the service worker.</p><div class="room-actions"><button class="danger-btn" id="wipeAll">EXPORT + WIPE APP DATA</button></div></div></div>`);bindTheme();applyTheme(localStorage.getItem("cubeclash-theme")||"dark");document.querySelector("#scrambleSpeedSetting")?.addEventListener("input",e=>{const value=Math.max(.05,Math.min(2,Number(e.target.value)||1));document.querySelector("#scrambleSpeedSettingValue").textContent=`${value.toFixed(2)}×`});document.querySelector("#save").onclick=()=>{settings.inspection=+document.querySelector("#ins").value;settings.scrambleSpeed=Math.max(.05,Math.min(2,Number(document.querySelector("#scrambleSpeedSetting")?.value)||1));settings.name=(document.querySelector("#displayName")?.value||"").trim().slice(0,24);const selected=document.querySelector(".theme-option.active")?.dataset.theme||currentTheme();applyTheme(selected);localStorage.setItem("cubeclash-settings",JSON.stringify(settings));toast("SETTINGS SAVED")};document.querySelector("#ex").onclick=async()=>{const b=new Blob([JSON.stringify(await exportData(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`cubeclash-${Date.now()}.json`;a.click()};document.querySelector("#im").onchange=async e=>{try{await importData(JSON.parse(await e.target.files[0].text()));toast("DATA IMPORTED")}catch{toast("IMPORT FAILED")}};document.querySelector("#cl").onclick=async()=>{if(confirm("Clear all local solves? This cannot be undone unless you exported them.")){await clearSolves();toast("SOLVES CLEARED")}};document.querySelector("#wipeAll").onclick=async()=>{if(!confirm("CubeClash will export your solve history and then clear local app data, cache, settings, and service worker. Continue?"))return;try{await wipeCubeClashData({downloadBackup:true});alert("Backup downloaded. CubeClash will reload with a clean installation.");location.reload()}catch(e){console.error(e);toast("RESET FAILED")}}}
 async function nav(x){
   if(window._cubeClashSoloKeyHandler){document.removeEventListener("keydown",window._cubeClashSoloKeyHandler,true);window._cubeClashSoloKeyHandler=null;}
   if(window._cubeClashSoloKeyUpHandler){document.removeEventListener("keyup",window._cubeClashSoloKeyUpHandler,true);window._cubeClashSoloKeyUpHandler=null;}
