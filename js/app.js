@@ -18,39 +18,49 @@ function renderCube(){
   const root=document.querySelector("#cube3d");
   if(!root)return;
   const size=s.puzzle==="222"?2:3;
+  const cubie=size===2?88:62;
   const gap=size===2?7:5;
-  const cubie=size===2?82:60;
   const pitch=cubie+gap;
-  const step=size===2?pitch:pitch;
+  const span=(size-1)*pitch;
   const state=buildCubeState(size,s.scramble);
+  const colors={R:"#c41e3a",O:"#ff7a00",W:"#f5f5f5",Y:"#ffd500",G:"#009b48",B:"#0051ba"};
+  const normalFace={
+    "1,0,0":"R","-1,0,0":"L","0,1,0":"U","0,-1,0":"D","0,0,1":"F","0,0,-1":"B"
+  };
+  const normalTransform={
+    R:"rotateY(90deg)",L:"rotateY(-90deg)",U:"rotateX(90deg)",D:"rotateX(-90deg)",F:"rotateY(0deg)",B:"rotateY(180deg)"
+  };
   root.innerHTML="";
-  root.style.width=`${size*pitch}px`;
-  root.style.height=`${size*pitch}px`;
-  root.dataset.size=size;
-  const faces={R:["R","rotateY(90deg) translateZ(HALFpx)"],L:["O","rotateY(-90deg) translateZ(HALFpx)"],U:["W","rotateX(90deg) translateZ(HALFpx)"],D:["Y","rotateX(-90deg) translateZ(HALFpx)"],F:["G","translateZ(HALFpx)"],B:["B","rotateY(180deg) translateZ(HALFpx)"]};
+  root.style.cssText=`position:relative;width:${size*pitch}px;height:${size*pitch}px;display:block;perspective:900px;perspective-origin:50% 50%;transform-style:preserve-3d;touch-action:none;user-select:none;cursor:grab;overflow:visible;`;
+  const model=document.createElement("div");
+  model.className="cube-model";
+  model.style.cssText=`position:absolute;left:50%;top:50%;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-28deg) rotateY(-38deg);`;
+  root.appendChild(model);
+
   for(const c of state){
     const el=document.createElement("div");
     el.className="cubelet";
-    el.style.width=`${cubie}px`;
-    el.style.height=`${cubie}px`;
-    el.style.setProperty("--half",`${cubie/2}px`);
-    el.style.transform=`translate(-50%,-50%) translate3d(${c.p[0]*(step/2)}px,${-c.p[1]*(step/2)}px,${c.p[2]*(step/2)}px)`;
+    el.style.cssText=`position:absolute;width:${cubie}px;height:${cubie}px;left:0;top:0;transform-style:preserve-3d;transform:translate3d(${c.p[0]*pitch-cubie/2}px,${-c.p[1]*pitch-cubie/2}px,${c.p[2]*pitch}px);background:#111;border:2px solid #050505;border-radius:${Math.max(7,cubie*.1)}px;box-sizing:border-box;box-shadow:inset 0 0 8px rgba(255,255,255,.035),0 2px 5px rgba(0,0,0,.45);`;
     const stickerByNormal=new Map(c.stickers.map(([n,color])=>[n.join(","),color]));
-    for(const [face,[fallbackColor,transform]] of Object.entries(faces)){
-      const st=document.createElement("i");
-      st.className="sticker sticker-face";
-      const normal={R:[1,0,0],L:[-1,0,0],U:[0,1,0],D:[0,-1,0],F:[0,0,1],B:[0,0,-1]}[face];
-      const color=stickerByNormal.get(normal.join(","));
+    for(const [key,face] of Object.entries(normalFace)){
+      const color=stickerByNormal.get(key);
       if(!color)continue;
-      st.classList.add(`sticker-${color}`);
-      st.style.transform=transform.replace("HALF",String(cubie/2-1));
+      const st=document.createElement("div");
+      const inset=Math.max(5,cubie*.075);
+      const stickerSize=cubie-inset*2;
+      st.className="cube-sticker";
+      st.style.cssText=`position:absolute;left:50%;top:50%;width:${stickerSize}px;height:${stickerSize}px;margin-left:-${stickerSize/2}px;margin-top:-${stickerSize/2}px;background:${colors[color]};border-radius:${Math.max(5,cubie*.095)}px;box-sizing:border-box;border:1px solid rgba(0,0,0,.28);box-shadow:inset 2px 2px 4px rgba(255,255,255,.22),inset -2px -2px 5px rgba(0,0,0,.24),0 0 1px rgba(0,0,0,.6);backface-visibility:hidden;transform-style:preserve-3d;transform:${normalTransform[face]} translateZ(${cubie/2+0.8}px);`;
+      if(color==="W")st.style.boxShadow="inset 2px 2px 4px rgba(255,255,255,.55),inset -2px -2px 5px rgba(0,0,0,.2),0 0 1px rgba(0,0,0,.55)";
       el.appendChild(st);
     }
-    root.appendChild(el);
+    model.appendChild(el);
   }
-  root.onpointerdown=e=>{root.setPointerCapture(e.pointerId);root.dataset.dragging="1";root._sx=e.clientX;root._sy=e.clientY;root._rx=parseFloat(root.dataset.rx||"-28");root._ry=parseFloat(root.dataset.ry||"-38")};
-  root.onpointermove=e=>{if(root.dataset.dragging!=="1")return;const dx=e.clientX-root._sx,dy=e.clientY-root._sy;root.style.transform=`rotateX(${root._rx-dy*.35}deg) rotateY(${root._ry+dx*.35}deg)`};
-  root.onpointerup=root.onpointercancel=e=>{root.dataset.dragging="0"};
+
+  let dragging=false,sx=0,sy=0,rx=-28,ry=-38;
+  const finish=()=>{dragging=false;root.style.cursor="grab";};
+  root.onpointerdown=e=>{dragging=true;root.setPointerCapture?.(e.pointerId);sx=e.clientX;sy=e.clientY;root.style.cursor="grabbing";};
+  root.onpointermove=e=>{if(!dragging)return;const dx=e.clientX-sx,dy=e.clientY-sy;model.style.transform=`rotateX(${rx-dy*.35}deg) rotateY(${ry+dx*.35}deg)`;};
+  root.onpointerup=finish;root.onpointercancel=finish;root.onpointerleave=()=>{if(dragging)finish()};
 }
 async function mountCube(){try{renderCube()}catch(err){console.error("CubeClash cube renderer error:",err);const h=document.querySelector("#cube3d");if(h)h.innerHTML=`<div class="cube-error"><strong>3D CUBE ERROR</strong><span>${esc(err.message||String(err))}</span></div>`}}
 async function solo(){if(!s.scramble)await scr();const a=await getSolves(),valid=a.filter(x=>x.penalty!=="DNF").map(x=>x.timeMs+(x.penalty==="+2"?2000:0));const avg=n=>valid.length>=n?fmt(valid.slice(0,n).reduce((a,b)=>a+b,0)/n):"—";v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · TOUCH TO START</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div class="stats-panel"><div class="stats-grid"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${valid.length?fmt(Math.min(...valid)):"—"}</strong></div><div class="stat-box"><small>AO5</small><strong>${avg(5)}</strong></div><div class="stat-box"><small>AO12</small><strong>${avg(12)}</strong></div></div><div class="solves-list">${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div></div>`);bindSolo()}
