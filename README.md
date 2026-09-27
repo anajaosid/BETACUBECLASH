@@ -42,3 +42,10 @@ Created and developed by **Sid Anajao**.
 - Prevented Space/Enter from scrolling the solo page, including repeated keydown events while holding Space.
 - Added DELETE button beside each recent solo solve.
 - Deleting a solve removes it from IndexedDB and refreshes solo statistics/history.
+
+## v48 changes
+- Fixed the cube turn engine mutating live cubies while iterating, which could rotate a cubie more than once during a single move.
+- Corrected standard face-turn directions for F and B while preserving the standard R/L/U/D conventions.
+- `2` turns now apply exactly two quarter-turns to the same affected layer.
+- Added internal cube-state validation and standard corner-cycle audits.
+- 3D and 2D scramble views continue to derive from the same cube state.

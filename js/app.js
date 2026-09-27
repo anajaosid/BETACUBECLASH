@@ -10,7 +10,7 @@ const toast=x=>{toastEl.textContent=x;toastEl.classList.add("show");clearTimeout
 const CUBE_COLORS={R:"R",L:"O",U:"W",D:"Y",F:"G",B:"B"};
 const MOVE_AXIS={R:"x",L:"x",U:"y",D:"y",F:"z",B:"z"};
 const MOVE_LAYER={R:1,L:-1,U:1,D:-1,F:1,B:-1};
-const MOVE_SIGN={R:-1,L:1,U:-1,D:1,F:-1,B:1};
+const MOVE_SIGN={R:-1,L:1,U:-1,D:1,F:1,B:-1};
 const COLOR_HEX={R:"#d71920",O:"#ff6a00",W:"#f7f7f7",Y:"#ffd500",G:"#009b48",B:"#0051ba"};
 
 function randomInt(max){return Math.floor(Math.random()*max)}
@@ -80,10 +80,10 @@ function applyMove(state,token){
   const layer=MOVE_LAYER[face];
   const base=MOVE_SIGN[face]*(token.includes("'")?-1:1);
   const turns=token.endsWith("2")?2:1;
+  const index=axis==="x"?0:axis==="y"?1:2;
+  const affected=state.filter(cubie=>cubie.p[index]===layer);
   for(let t=0;t<turns;t++){
-    for(const cubie of state){
-      const index=axis==="x"?0:axis==="y"?1:2;
-      if(cubie.p[index]!==layer)continue;
+    for(const cubie of affected){
       cubie.p=rotateVector(cubie.p,axis,base);
       cubie.stickers=cubie.stickers.map(st=>({normal:rotateVector(st.normal,axis,base),color:st.color}));
     }
@@ -103,11 +103,48 @@ function cubeStateSignature(state){
 function inverseScramble(scramble){
   return scramble.trim().split(/\s+/).reverse().map(t=>t.endsWith("2")?t:t.endsWith("'")?t.slice(0,-1):`${t}'`).join(" ");
 }
+const STANDARD_CORNER_CYCLES={
+  U:[[1,1,1],[-1,1,1],[-1,1,-1],[1,1,-1]],
+  D:[[1,-1,1],[1,-1,-1],[-1,-1,-1],[-1,-1,1]],
+  R:[[1,1,1],[1,1,-1],[1,-1,-1],[1,-1,1]],
+  L:[[-1,1,1],[-1,-1,1],[-1,-1,-1],[-1,1,-1]],
+  F:[[1,1,1],[1,-1,1],[-1,-1,1],[-1,1,1]],
+  B:[[1,1,-1],[-1,1,-1],[-1,-1,-1],[1,-1,-1]]
+};
+function validateCubeState(size,state){
+  const expected=size===3?54:24;
+  const seen=new Set(),counts={R:0,O:0,W:0,Y:0,G:0,B:0};
+  for(const c of state){
+    const key=c.p.join(",");
+    if(seen.has(key))return false;
+    seen.add(key);
+    for(const st of c.stickers){
+      if(!counts.hasOwnProperty(st.color)||!Array.isArray(st.normal)||st.normal.filter(Boolean).length===0)return false;
+      counts[st.color]++;
+    }
+  }
+  return [...Object.values(counts)].reduce((a,b)=>a+b,0)===expected && Object.values(counts).every((n)=>n===size*size);
+}
+function auditStandardMoveGeometry(size){
+  const solved=buildSolvedCubeState(size);
+  for(const face of Object.keys(STANDARD_CORNER_CYCLES)){
+    const after=buildCubeState(size,face);
+    const cycle=STANDARD_CORNER_CYCLES[face];
+    for(let i=0;i<cycle.length;i++){
+      const source=cycle[i],expected=cycle[(i+1)%cycle.length];
+      const sourceIndex=solved.findIndex(c=>c.p.every((v,j)=>v===source[j]));
+      if(sourceIndex<0)return false;
+      const actual=after[sourceIndex].p;
+      if(actual[0]!==expected[0]||actual[1]!==expected[1]||actual[2]!==expected[2])return false;
+    }
+  }
+  return true;
+}
 function auditCubeEngine(size,scramble){
   const solved=buildSolvedCubeState(size);
   const state=buildCubeState(size,scramble);
   const restored=buildCubeState(size,`${scramble} ${inverseScramble(scramble)}`);
-  const ok=cubeStateSignature(restored)===cubeStateSignature(solved);
+  const ok=validateCubeState(size,state)&&validateCubeState(size,restored)&&auditStandardMoveGeometry(size)&&cubeStateSignature(restored)===cubeStateSignature(solved);
   if(!ok)console.error("CubeClash cube-engine audit failed",{size,scramble});
   return ok;
 }
