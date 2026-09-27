@@ -118,7 +118,9 @@ function makeCubePiece(cubie,size,half,stickers,pieceStyle){
     if(color){
       const inset=size===2?Math.max(6,cubie*.075):Math.max(5,cubie*.085);
       const sticker=document.createElement("div");
-      sticker.style.cssText=`position:absolute;left:${inset}px;top:${inset}px;width:${cubie-inset*2}px;height:${cubie-inset*2}px;box-sizing:border-box;background:${COLOR_HEX[color]};border:2px solid rgba(0,0,0,.32);border-radius:${Math.max(3,cubie*.05)}px;box-shadow:inset 2px 2px 4px rgba(255,255,255,.2),inset -3px -3px 5px rgba(0,0,0,.26),0 1px 2px rgba(0,0,0,.55);transform:translateZ(2px);`;
+      sticker.className=`cube-sticker cube-sticker-${color}`;
+      sticker.dataset.color=color;
+      sticker.style.cssText=`position:absolute;left:${inset}px;top:${inset}px;width:${cubie-inset*2}px;height:${cubie-inset*2}px;box-sizing:border-box;background:${COLOR_HEX[color]} !important;border:2px solid rgba(0,0,0,.32);border-radius:${Math.max(3,cubie*.05)}px;box-shadow:inset 2px 2px 4px rgba(255,255,255,.2),inset -3px -3px 5px rgba(0,0,0,.26),0 1px 2px rgba(0,0,0,.55);transform:translateZ(2px);backface-visibility:visible;`;
       faceEl.appendChild(sticker);
     }
     piece.appendChild(faceEl);
@@ -441,15 +443,18 @@ function updateMatchUI(){
     const waiting=s.nextRoundReady&&!s.remoteNextRoundReady;
     nr.disabled=!show||waiting||(finalRound&&bothReady);
     if(waiting)nr.textContent="WAITING FOR OPPONENT";
-    else if(finalRound)nr.textContent=bothReady?"MATCH FINISHED":"FINISH ROUND";
+    else if(finalRound)nr.textContent="FINISH ROUND";
     else nr.textContent="NEXT ROUND";
   }
-  if(panel){panel.hidden=!bothFinished; if(bothFinished&&s.roundResult){
-    const p1n=s.match?.names?.host||"PLAYER 1",p2n=s.match?.names?.guest||"PLAYER 2";
-    document.querySelector("#resultP1Name").textContent=p1n;document.querySelector("#resultP2Name").textContent=p2n;
-    document.querySelector("#resultP1Time").textContent=s.roundResult.p1||"DNF";document.querySelector("#resultP2Time").textContent=s.roundResult.p2||"DNF";
-    const a=resultValue(s.roundResult.p1),b=resultValue(s.roundResult.p2);document.querySelector("#resultDifference").textContent=(!Number.isFinite(a)||!Number.isFinite(b))?"—":`${fmt(Math.abs(a-b)*1000)} DIFFERENCE`;
-  }}
+  if(panel){
+    panel.hidden=!(bothFinished&&bothReady&&!!s.roundResult);
+    if(!panel.hidden){
+      const p1n=s.match?.names?.host||"PLAYER 1",p2n=s.match?.names?.guest||"PLAYER 2";
+      document.querySelector("#resultP1Name").textContent=p1n;document.querySelector("#resultP2Name").textContent=p2n;
+      document.querySelector("#resultP1Time").textContent=s.roundResult.p1||"DNF";document.querySelector("#resultP2Time").textContent=s.roundResult.p2||"DNF";
+      const a=resultValue(s.roundResult.p1),b=resultValue(s.roundResult.p2);document.querySelector("#resultDifference").textContent=(!Number.isFinite(a)||!Number.isFinite(b))?"—":`${fmt(Math.abs(a-b)*1000)} DIFFERENCE`;
+    }
+  }
   if(tools)tools.hidden=s.matchPhase!=="finished";
   if(note)note.textContent=s.matchPhase==="finished"?`YOUR RESULT: ${s.myRoundResult||"—"}${s.matchPenalty?` / ${s.matchPenalty}`:""}`:"";
   const q=document.querySelector("#mediaQuality");if(q)q.textContent=`CONNECTION: ${s.mediaQuality||"FAIR"}`;
