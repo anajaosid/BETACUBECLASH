@@ -108,3 +108,15 @@ button,.primary-btn,.ghost-btn,.danger-btn,.icon-btn{font-family:var(--sans)!imp
 body.theme-light .cube3d-wrap{background:radial-gradient(circle at 50% 38%,#fff 0,#f3f3f3 50%,#dedede 100%)}
 body.theme-light .cube3d{filter:drop-shadow(0 22px 18px #8888)}
 @media(max-width:900px){.cube3d-wrap{min-height:390px}.cube3d{transform:rotateX(-28deg) rotateY(-38deg) scale(.9)}}
+
+/* v25: readable typography + corrected 3D cube geometry */
+:root{--sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+html,body,button,input,select,textarea{font-family:var(--sans)!important}
+body{letter-spacing:normal}
+.topbar-right,#networkText,.icon-btn,.footer,.timer-label,.timer-hint,.metric small,.metric strong,.scramble-text,.scramble-2d-label,.center-scramble,.match-instructions,.match-connection,.player-name,.player-state small,.room-help,.code-input,.room-code-label,.connection-box,.video-label,.video-state,.tutorial-kicker,.tutorial-intro,.tutorial-steps p,.field label,.theme-option small,.menu-note,.setting-card p,.solves-list,.solve-row{font-family:var(--sans)!important;letter-spacing:.03em}
+.cube3d-wrap{position:relative;overflow:hidden;min-height:520px;perspective:1200px;perspective-origin:50% 48%;display:grid;place-items:center}
+.cube3d{position:relative;left:auto;top:auto;width:300px;height:300px;transform-style:preserve-3d;transform:rotateX(-28deg) rotateY(-38deg) scale(1.02);will-change:transform}
+.cubelet{position:absolute;left:50%;top:50%;transform-style:preserve-3d;background:#111;border:2px solid #050505;border-radius:11%;box-shadow:inset 0 0 0 1px #444,inset 0 -8px 14px #000b,0 8px 14px #0009;backface-visibility:hidden}
+.sticker-face{position:absolute;left:3px;top:3px;width:calc(100% - 6px);height:calc(100% - 6px);border-radius:10%;border:2px solid #1118;backface-visibility:hidden;box-shadow:inset 2px 2px 4px #fff4,inset -3px -3px 5px #0005,0 2px 3px #0007}
+@media(max-width:900px){.cube3d-wrap{min-height:420px}.cube3d{transform:rotateX(-28deg) rotateY(-38deg) scale(.86)}}
+@media(max-width:520px){.cube3d-wrap{min-height:350px}.cube3d{transform:rotateX(-28deg) rotateY(-38deg) scale(.68)}}
