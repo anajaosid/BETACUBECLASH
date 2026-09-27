@@ -178,3 +178,13 @@ body.theme-light .cube-player-wrap{background:radial-gradient(circle at 50% 42%,
 
 .cube-move-label{min-height:30px;display:grid;place-items:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font:700 10px var(--mono);letter-spacing:.14em;color:var(--muted);background:#050505}.cube-move-label::first-letter{color:inherit}.cube-follow-foot button:disabled{opacity:.45;cursor:wait}
 body.theme-light .cube-move-label{background:#f7f7f7}
+
+/* v44: adjustable scramble animation speed for learning */
+.scramble-speed{padding:12px 16px 10px;border-bottom:1px solid var(--line);background:rgba(127,127,127,.035)}
+.scramble-speed-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font:700 9px var(--mono);letter-spacing:.12em;color:var(--muted)}
+.scramble-speed-head strong{color:var(--text);font-size:10px}
+.scramble-speed input[type="range"],#scrambleSpeedSetting{width:100%;margin:10px 0 5px;accent-color:currentColor;cursor:pointer}
+.scramble-speed-scale{display:flex;justify-content:space-between;gap:10px;font:600 8px var(--mono);letter-spacing:.08em;color:var(--muted)}
+.scramble-speed-scale strong{color:var(--text)}
+body.theme-light .scramble-speed{background:rgba(0,0,0,.025)}
+@media(max-width:520px){.scramble-speed{padding:10px 12px 9px}.scramble-speed-head{font-size:8px}.scramble-speed-scale{font-size:7px}}
