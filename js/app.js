@@ -38,13 +38,24 @@ function normalizeWcaScramble(scramble){
   return String(scramble).replace(/\s+/g," ").trim();
 }
 
+function validCubeScramble(text){
+  const tokens=normalizeWcaScramble(text).split(/\s+/).filter(Boolean);
+  if(!tokens.length)return false;
+  const max=s.puzzle==="222"?30:40;
+  if(tokens.length>max)return false;
+  return tokens.every(t=>/^[RLUDFB](2|')?$/.test(t));
+}
+
 async function randomScramble(){
   try{
     const mod=await loadWcaScrambler();
     const event=s.puzzle==="222"?"222":"333";
     const result=await mod.randomScrambleForEvent(event);
-    const text=typeof result==="string"?result:(result?.toString?.()||"");
-    if(text)return normalizeWcaScramble(text);
+    const text=normalizeWcaScramble(typeof result==="string"?result:(result?.toString?.()||""));
+    if(validCubeScramble(text)){
+      const size=s.puzzle==="222"?2:3;
+      if(auditCubeEngine(size,text))return text;
+    }
   }catch(e){
     console.warn("WCA-style scrambler unavailable; using local fallback",e);
   }
@@ -161,14 +172,14 @@ function render222Cube(root){
   root.innerHTML="";
   root.style.cssText=`position:relative;width:100%;height:100%;min-height:420px;display:grid;place-items:center;perspective:1250px;overflow:hidden;touch-action:none;user-select:none;`;
   const model=document.createElement("div");model.className="cube-model cube-model-222";
-  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-24deg) rotateY(-35deg);will-change:transform;`;
+  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-18deg) rotateY(0deg);will-change:transform;`;
   root.appendChild(model);
   for(const c of state){
     const stickers=new Map(c.stickers.map(st=>[st.normal.join(","),st.color]));
     const piece=makeCubePiece(c,size,half,stickers,`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;transform-style:preserve-3d;transform:translate3d(${c.p[0]*(pitch/2)}px,${-c.p[1]*(pitch/2)}px,${c.p[2]*(pitch/2)}px);background:#111;border:2px solid #030303;border-radius:9px;box-shadow:inset 0 0 0 1px #383838,inset 0 -7px 12px #000b,0 5px 10px #0009;`);
     model.appendChild(piece);
   }
-  bindCubeDrag(root,model,-24,-35);
+  bindCubeDrag(root,model,-18,0);
 }
 function render333Cube(root){
   const size=3,state=buildCubeState(3,s.scramble);
@@ -176,14 +187,14 @@ function render333Cube(root){
   root.innerHTML="";
   root.style.cssText=`position:relative;width:100%;height:100%;min-height:420px;display:grid;place-items:center;perspective:1250px;overflow:hidden;touch-action:none;user-select:none;`;
   const model=document.createElement("div");model.className="cube-model cube-model-333";
-  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-25deg) rotateY(-36deg);will-change:transform;`;
+  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-18deg) rotateY(0deg);will-change:transform;`;
   root.appendChild(model);
   for(const c of state){
     const stickers=new Map(c.stickers.map(st=>[st.normal.join(","),st.color]));
     const piece=makeCubePiece(c,size,half,stickers,`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;transform-style:preserve-3d;transform:translate3d(${c.p[0]*pitch}px,${-c.p[1]*pitch}px,${c.p[2]*pitch}px);background:#111;border:2px solid #030303;border-radius:7px;box-shadow:inset 0 0 0 1px #383838,inset 0 -5px 9px #000b,0 4px 8px #0008;`);
     model.appendChild(piece);
   }
-  bindCubeDrag(root,model,-25,-36);
+  bindCubeDrag(root,model,-18,0);
 }
 function bindCubeDrag(root,model,rx0,ry0){
   let dragging=false,sx=0,sy=0,rx=rx0,ry=ry0;
