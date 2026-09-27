@@ -101,13 +101,13 @@ button,.primary-btn,.ghost-btn,.danger-btn,.icon-btn{font-family:var(--sans)!imp
 .creator-card{min-height:150px;display:flex;flex-direction:column;justify-content:center}.creator-name{font-size:clamp(28px,5vw,48px);letter-spacing:-.03em;margin:10px 0}.creator-card p{margin:0;color:var(--muted);font-size:11px}
 /* more physical-looking cube */
 .cube3d-wrap{min-height:500px;background:radial-gradient(circle at 50% 38%,#222 0,#0a0a0a 45%,#020202 82%)}
-.cube3d{filter:drop-shadow(0 22px 18px #000b);transform:rotateX(-28deg) rotateY(-38deg) scale(1.06)}
+.cube3d{filter:drop-shadow(0 22px 18px #000b)}
 .cubelet{background:linear-gradient(145deg,#3a3a3a 0%,#171717 55%,#050505 100%);border:3px solid #050505;border-radius:10px;box-shadow:inset 0 0 0 1px #555,inset 0 0 12px #000,0 8px 14px #000;}
 .sticker{left:4px;top:4px;width:calc(100% - 8px);height:calc(100% - 8px);border-radius:9px;border:2px solid #111a;box-shadow:inset 3px 3px 4px #ffffff45,inset -4px -4px 5px #0005,0 2px 3px #0008;}
 .sticker-R{background:linear-gradient(145deg,#ff5555,#c4141c 65%,#8f0d13)}.sticker-O{background:linear-gradient(145deg,#ffad4f,#ed5d08 65%,#b83d00)}.sticker-W{background:linear-gradient(145deg,#fff,#e2e2e2 65%,#bcbcbc)}.sticker-Y{background:linear-gradient(145deg,#fff95a,#e7c400 65%,#b79500)}.sticker-G{background:linear-gradient(145deg,#4df087,#10a64f 65%,#067131)}.sticker-B{background:linear-gradient(145deg,#65a7ff,#1c67d0 65%,#10448f)}
 body.theme-light .cube3d-wrap{background:radial-gradient(circle at 50% 38%,#fff 0,#f3f3f3 50%,#dedede 100%)}
 body.theme-light .cube3d{filter:drop-shadow(0 22px 18px #8888)}
-@media(max-width:900px){.cube3d-wrap{min-height:390px}.cube3d{transform:rotateX(-28deg) rotateY(-38deg) scale(.9)}}
+@media(max-width:900px){.cube3d-wrap{min-height:390px}}
 
 /* v25: readable typography + corrected 3D cube geometry */
 :root{--sans:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;--mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -118,5 +118,5 @@ body{letter-spacing:normal}
 .cube3d{position:relative;left:auto;top:auto;width:300px;height:300px;transform-style:preserve-3d;transform:rotateX(-28deg) rotateY(-38deg) scale(1.02);will-change:transform}
 .cubelet{position:absolute;left:50%;top:50%;transform-style:preserve-3d;background:#111;border:2px solid #050505;border-radius:11%;box-shadow:inset 0 0 0 1px #444,inset 0 -8px 14px #000b,0 8px 14px #0009;backface-visibility:hidden}
 .sticker-face{position:absolute;left:3px;top:3px;width:calc(100% - 6px);height:calc(100% - 6px);border-radius:10%;border:2px solid #1118;backface-visibility:hidden;box-shadow:inset 2px 2px 4px #fff4,inset -3px -3px 5px #0005,0 2px 3px #0007}
-@media(max-width:900px){.cube3d-wrap{min-height:420px}.cube3d{transform:rotateX(-28deg) rotateY(-38deg) scale(.86)}}
-@media(max-width:520px){.cube3d-wrap{min-height:350px}.cube3d{transform:rotateX(-28deg) rotateY(-38deg) scale(.68)}}
+@media(max-width:900px){.cube3d-wrap{min-height:420px}}
+@media(max-width:520px){.cube3d-wrap{min-height:350px}}
