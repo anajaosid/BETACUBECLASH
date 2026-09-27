@@ -1,4 +1,5 @@
 import {addSolve,getSolves,deleteSolve,clearSolves,exportData,importData} from "./storage.js";
+import {MOVES,CUBE_COLORS,MOVE_AXIS,MOVE_LAYER,MOVE_SIGN,COLOR_HEX,buildSolvedCubeState,applyMove,buildCubeState,inverseScramble,auditCubeEngine} from "./cube-engine.js";
 import {wipeCubeClashData} from "./reset.js";
 import {P2PRoom} from "./p2p.js";
 const app=document.querySelector("#app"),toastEl=document.querySelector("#toast"); app.dataset.started="1";let deferredInstall=null;let settings={};try{settings=JSON.parse(localStorage.getItem("cubeclash-settings")||"{}")}catch{settings={}}settings.inspection??=15;settings.sound??=true;settings.name??="";settings.scrambleSpeed??=1;let s={puzzle:"333",scramble:"",phase:"ready",matchPhase:"ready",inspectionStart:0,solveStart:0,raf:0,last:null,room:null,role:null,opponent:{time:"0.00",status:"WAITING"},round:1,mediaQuality:"FAIR",mediaStatsRaf:0,nextRoundReady:false,matchHistory:[]};
@@ -6,14 +7,7 @@ function currentTheme(){return localStorage.getItem("cubeclash-theme")||"dark";}
 function applyTheme(theme){document.body.classList.toggle("theme-light",theme==="light");document.documentElement.style.colorScheme=theme;localStorage.setItem("cubeclash-theme",theme);document.querySelectorAll(".theme-option").forEach(x=>x.classList.toggle("active",x.dataset.theme===theme));}
 function bindTheme(){document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>applyTheme(b.dataset.theme));}
 function themePanel(){return `<div class="theme-panel"><div class="theme-head"><strong>SELECT THEME</strong><span>APPEARANCE</span></div><div class="theme-options"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div><div class="menu-note">YOUR THEME IS SAVED ON THIS DEVICE. YOU CAN CHANGE IT LATER IN SETTINGS.</div></div>`}
-const toast=x=>{toastEl.textContent=x;toastEl.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove("show"),1800)};const esc=x=>String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));const fmt=ms=>(ms/1000).toFixed(2);function v(x){app.innerHTML=`<section class="view">${x}</section>`}const MOVES={333:["R","L","U","D","F","B"],222:["R","L","U","D","F","B"]};
-const CUBE_COLORS={R:"R",L:"O",U:"W",D:"Y",F:"G",B:"B"};
-const MOVE_AXIS={R:"x",L:"x",U:"y",D:"y",F:"z",B:"z"};
-const MOVE_LAYER={R:1,L:-1,U:1,D:-1,F:1,B:-1};
-const MOVE_SIGN={R:-1,L:1,U:-1,D:1,F:1,B:-1};
-const COLOR_HEX={R:"#d71920",O:"#ff6a00",W:"#f7f7f7",Y:"#ffd500",G:"#009b48",B:"#0051ba"};
-
-function randomInt(max){return Math.floor(Math.random()*max)}
+const toast=x=>{toastEl.textContent=x;toastEl.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove("show"),1800)};const esc=x=>String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));const fmt=ms=>(ms/1000).toFixed(2);function v(x){app.innerHTML=`<section class="view">${x}</section>`}function randomInt(max){return Math.floor(Math.random()*max)}
 function ownScramble(){
   const faces=MOVES[s.puzzle]||MOVES[333];
   const suffix=["","'","2"];
@@ -43,111 +37,7 @@ function randomScramble(){
   while((!validCubeScramble(text)||!auditCubeEngine(s.puzzle==="222"?2:3,text))&&guard++<20)text=ownScramble();
   return text;
 }
-
 async function scr(){s.scramble=randomScramble();return s.scramble}
-function cube(){const moves=s.scramble.trim().split(/\s+/).filter(Boolean);const speed=Math.max(.05,Math.min(2,Number(settings.scrambleSpeed)||1));return `<div class="cube3d-wrap cube-player-wrap"><div class="cube-follow-head"><span>FOLLOW THE SCRAMBLE</span><span>WHITE TOP · GREEN FRONT</span></div><div class="cube3d" id="cube3d" data-puzzle="${s.puzzle}" data-scramble="${esc(s.scramble)}"></div><div class="cube-move-label" id="scrambleMoveLabel">START / SOLVED</div><div class="scramble-speed"><div class="scramble-speed-head"><span>SCRAMBLE SPEED</span><strong id="scrambleSpeedValue">${speed.toFixed(2)}×</strong></div><input id="scrambleSpeed" type="range" min="0.05" max="2" step="0.05" value="${speed}" aria-label="Scramble animation speed"><div class="scramble-speed-scale"><span>SLOW · NEWBIE</span><span>FAST</span></div></div><div class="cube-follow-foot"><span>${moves.length} MOVES · WATCH EACH TURN</span><button class="ghost-btn" id="replayScramble">REPLAY SCRAMBLE</button></div></div>`}
-
-function rotateVector(v,axis,quarterTurns){
-  let [x,y,z]=v;
-  let n=((quarterTurns%4)+4)%4;
-  while(n--){
-    if(axis==="x")[y,z]=[-z,y];
-    else if(axis==="y")[x,z]=[z,-x];
-    else [x,y]=[y,-x];
-  }
-  return [x,y,z];
-}
-
-function buildSolvedCubeState(size){
-  const state=[];
-  for(let x=0;x<size;x++)for(let y=0;y<size;y++)for(let z=0;z<size;z++){
-    const p=[x*2/(size-1)-1,y*2/(size-1)-1,z*2/(size-1)-1];
-    const stickers=[];
-    if(x===size-1)stickers.push({normal:[1,0,0],color:CUBE_COLORS.R});
-    if(x===0)stickers.push({normal:[-1,0,0],color:CUBE_COLORS.L});
-    if(y===size-1)stickers.push({normal:[0,1,0],color:CUBE_COLORS.U});
-    if(y===0)stickers.push({normal:[0,-1,0],color:CUBE_COLORS.D});
-    if(z===size-1)stickers.push({normal:[0,0,1],color:CUBE_COLORS.F});
-    if(z===0)stickers.push({normal:[0,0,-1],color:CUBE_COLORS.B});
-    state.push({p,stickers});
-  }
-  return state;
-}
-
-function applyMove(state,token){
-  const face=token[0];
-  const axis=MOVE_AXIS[face];
-  const layer=MOVE_LAYER[face];
-  const base=MOVE_SIGN[face]*(token.includes("'")?-1:1);
-  const turns=token.endsWith("2")?2:1;
-  const index=axis==="x"?0:axis==="y"?1:2;
-  const affected=state.filter(cubie=>cubie.p[index]===layer);
-  for(let t=0;t<turns;t++){
-    for(const cubie of affected){
-      cubie.p=rotateVector(cubie.p,axis,base);
-      cubie.stickers=cubie.stickers.map(st=>({normal:rotateVector(st.normal,axis,base),color:st.color}));
-    }
-  }
-}
-
-function buildCubeState(size,scramble){
-  const state=buildSolvedCubeState(size);
-  const tokens=scramble.trim()?scramble.trim().split(/\s+/):[];
-  for(const token of tokens)if(/^[RLUDFB](2|')?$/.test(token))applyMove(state,token);
-  return state;
-}
-
-function cubeStateSignature(state){
-  return state.map(c=>`${c.p.join(",")}:${c.stickers.map(s=>s.normal.join(",")+s.color).sort().join("|")}`).sort().join(";");
-}
-function inverseScramble(scramble){
-  return scramble.trim().split(/\s+/).reverse().map(t=>t.endsWith("2")?t:t.endsWith("'")?t.slice(0,-1):`${t}'`).join(" ");
-}
-const STANDARD_CORNER_CYCLES={
-  U:[[1,1,1],[-1,1,1],[-1,1,-1],[1,1,-1]],
-  D:[[1,-1,1],[1,-1,-1],[-1,-1,-1],[-1,-1,1]],
-  R:[[1,1,1],[1,1,-1],[1,-1,-1],[1,-1,1]],
-  L:[[-1,1,1],[-1,-1,1],[-1,-1,-1],[-1,1,-1]],
-  F:[[1,1,1],[1,-1,1],[-1,-1,1],[-1,1,1]],
-  B:[[1,1,-1],[-1,1,-1],[-1,-1,-1],[1,-1,-1]]
-};
-function validateCubeState(size,state){
-  const expected=size===3?54:24;
-  const seen=new Set(),counts={R:0,O:0,W:0,Y:0,G:0,B:0};
-  for(const c of state){
-    const key=c.p.join(",");
-    if(seen.has(key))return false;
-    seen.add(key);
-    for(const st of c.stickers){
-      if(!counts.hasOwnProperty(st.color)||!Array.isArray(st.normal)||st.normal.filter(Boolean).length===0)return false;
-      counts[st.color]++;
-    }
-  }
-  return [...Object.values(counts)].reduce((a,b)=>a+b,0)===expected && Object.values(counts).every((n)=>n===size*size);
-}
-function auditStandardMoveGeometry(size){
-  const solved=buildSolvedCubeState(size);
-  for(const face of Object.keys(STANDARD_CORNER_CYCLES)){
-    const after=buildCubeState(size,face);
-    const cycle=STANDARD_CORNER_CYCLES[face];
-    for(let i=0;i<cycle.length;i++){
-      const source=cycle[i],expected=cycle[(i+1)%cycle.length];
-      const sourceIndex=solved.findIndex(c=>c.p.every((v,j)=>v===source[j]));
-      if(sourceIndex<0)return false;
-      const actual=after[sourceIndex].p;
-      if(actual[0]!==expected[0]||actual[1]!==expected[1]||actual[2]!==expected[2])return false;
-    }
-  }
-  return true;
-}
-function auditCubeEngine(size,scramble){
-  const solved=buildSolvedCubeState(size);
-  const state=buildCubeState(size,scramble);
-  const restored=buildCubeState(size,`${scramble} ${inverseScramble(scramble)}`);
-  const ok=validateCubeState(size,state)&&validateCubeState(size,restored)&&auditStandardMoveGeometry(size)&&cubeStateSignature(restored)===cubeStateSignature(solved);
-  if(!ok)console.error("CubeClash cube-engine audit failed",{size,scramble});
-  return ok;
-}
 
 function stickerTransform(normal,d){
   const [x,y,z]=normal;
@@ -233,9 +123,14 @@ function renderCube(root=document.querySelector("#cube3d"),state=buildCubeState(
 function cubeMoveDuration(){const base=s.puzzle==="222"?260:220;const speed=Math.max(.05,Math.min(2,Number(settings.scrambleSpeed)||1));return Math.round(base/speed)}
 function cubeMoveAngle(token, quarterSignOverride=null){
   const face=token[0];
+  const axis=MOVE_AXIS[face];
   const sign=MOVE_SIGN[face]*(token.includes("'")?-1:1);
   const quarter=quarterSignOverride==null?sign:quarterSignOverride;
-  return {axis:MOVE_AXIS[face],angle:quarter*90};
+  // CubeClash state coordinates use +Y as up, while CSS 3D uses +Y down.
+  // X/Z CSS rotations therefore need their visual direction inverted so the
+  // animation performs the same physical turn as applyMove().
+  const cssQuarter=(axis==="x"||axis==="z")?-quarter:quarter;
+  return {axis,angle:cssQuarter*90};
 }
 function cubePosition(c,size){
   const cubie=size===2?82:54,gap=size===2?4:3,pitch=cubie+gap;
