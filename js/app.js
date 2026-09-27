@@ -13,9 +13,19 @@ const MOVE_LAYER={R:1,L:-1,U:1,D:-1,F:1,B:-1};
 const MOVE_SIGN={R:-1,L:1,U:1,D:-1,F:-1,B:1};
 const COLOR_HEX={R:"#d71920",O:"#ff6a00",W:"#f7f7f7",Y:"#ffd500",G:"#009b48",B:"#0051ba"};
 
-function randomScramble(){
+let wcaScrambleModule=null;
+let wcaScramblePromise=null;
+async function loadWcaScrambler(){
+  if(wcaScrambleModule)return wcaScrambleModule;
+  if(!wcaScramblePromise){
+    wcaScramblePromise=import("https://cdn.cubing.net/v0/js/cubing/scramble").then(m=>{wcaScrambleModule=m;return m;});
+  }
+  return wcaScramblePromise;
+}
+
+function localScrambleFallback(){
   const faces=MOVES[s.puzzle]||MOVES[333],suffix=["","'","2"],axis=MOVE_AXIS;
-  const count=s.puzzle==="222"?9:20;let out=[],lastAxis="";
+  const count=s.puzzle==="222"?11:25;let out=[],lastAxis="";
   while(out.length<count){
     const f=faces[Math.floor(Math.random()*faces.length)];
     if(axis[f]===lastAxis)continue;
@@ -24,7 +34,24 @@ function randomScramble(){
   return out.join(" ");
 }
 
-async function scr(){s.scramble=randomScramble();return s.scramble}
+function normalizeWcaScramble(scramble){
+  return String(scramble).replace(/\s+/g," ").trim();
+}
+
+async function randomScramble(){
+  try{
+    const mod=await loadWcaScrambler();
+    const event=s.puzzle==="222"?"222":"333";
+    const result=await mod.randomScrambleForEvent(event);
+    const text=typeof result==="string"?result:(result?.toString?.()||"");
+    if(text)return normalizeWcaScramble(text);
+  }catch(e){
+    console.warn("WCA-style scrambler unavailable; using local fallback",e);
+  }
+  return localScrambleFallback();
+}
+
+async function scr(){s.scramble=await randomScramble();return s.scramble}
 function cube(){return `<div class="cube3d-wrap"><div class="cube3d" id="cube3d" data-puzzle="${s.puzzle}" data-scramble="${esc(s.scramble)}"></div></div>`}
 
 function rotateVector(v,axis,quarterTurns){
@@ -173,8 +200,72 @@ function renderCube(){
   if(size===2)render222Cube(root);else render333Cube(root);
 }
 async function mountCube(){try{renderCube()}catch(err){console.error("CubeClash cube renderer error:",err);const h=document.querySelector("#cube3d");if(h)h.innerHTML=`<div class="cube-error"><strong>3D CUBE ERROR</strong><span>${esc(err.message||String(err))}</span></div>`}}
-async function solo(){if(!s.scramble)await scr();const a=await getSolves(),valid=a.filter(x=>x.penalty!=="DNF").map(x=>x.timeMs+(x.penalty==="+2"?2000:0));const avg=n=>valid.length>=n?fmt(valid.slice(0,n).reduce((a,b)=>a+b,0)/n):"—";v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · TOUCH TO START</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div class="stats-panel"><div class="stats-grid"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${valid.length?fmt(Math.min(...valid)):"—"}</strong></div><div class="stat-box"><small>AO5</small><strong>${avg(5)}</strong></div><div class="stat-box"><small>AO12</small><strong>${avg(12)}</strong></div></div><div class="solves-list">${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div></div>`);bindSolo()}
-function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);document.querySelector("#tl").textContent=label}function stop(){cancelAnimationFrame(s.raf)}function loop(){const n=performance.now();if(s.phase==="inspection")set(Math.max(0,settings.inspection*1000-(n-s.inspectionStart)),"INSPECTION");if(s.phase==="solving")set(n-s.solveStart,"SOLVING");s.raf=requestAnimationFrame(loop)}function press(){if(s.phase==="ready"||s.phase==="stopped"){s.phase="inspection";s.inspectionStart=performance.now();loop();return}if(s.phase==="inspection"){const e=performance.now()-s.inspectionStart;s.penalty=e>=17000?"DNF":e>=15000?"+2":"";s.phase="solving";s.solveStart=performance.now();return}if(s.phase==="solving")finish()}async function finish(){const ms=performance.now()-s.solveStart;stop();s.phase="stopped";const display=s.penalty==="DNF"?"DNF":fmt(ms+(s.penalty==="+2"?2000:0));s.last={display};await addSolve({id:crypto.randomUUID(),createdAt:Date.now(),puzzle:s.puzzle,scramble:s.scramble,timeMs:ms,penalty:s.penalty,display});toast(display);setTimeout(async()=>{s.phase="ready";await scr();solo()},300)}function bindSolo(){mountCube();document.querySelector("#new").onclick=async()=>{stop();s.phase="ready";await scr();solo()};document.querySelector("#p").onchange=async e=>{s.puzzle=e.target.value;stop();s.phase="ready";await scr();solo()};document.querySelector("#copy").onclick=()=>navigator.clipboard?.writeText(s.scramble).then(()=>toast("SCRAMBLE COPIED"));document.querySelector("#zone").onpointerdown=()=>press();window.onkeydown=e=>{if((e.code==="Space"||e.code==="Enter")&&!e.repeat){e.preventDefault();press()}}}
+function adjustedSolveMs(x){
+  if(!x||x.penalty==="DNF"||x.display==="DNF")return Infinity;
+  const base=Number(x.timeMs)||0;
+  return base+(x.penalty==="+2"?2000:0);
+}
+function rollingAverage(solves,n){
+  if(solves.length<n)return "—";
+  const window=solves.slice(0,n).map(adjustedSolveMs);
+  const dnf=window.filter(x=>!Number.isFinite(x)).length;
+  if(dnf>=2)return "DNF";
+  const finite=window.filter(Number.isFinite).sort((a,b)=>a-b);
+  if(!finite.length)return "DNF";
+  const values=finite.slice(1,Math.max(1,finite.length-1));
+  if(!values.length)return "DNF";
+  return fmt(values.reduce((a,b)=>a+b,0)/values.length);
+}
+function bestSolve(solves){
+  const values=solves.map(adjustedSolveMs).filter(Number.isFinite);
+  return values.length?fmt(Math.min(...values)):"—";
+}
+function buildTimeGraph(solves){
+  const values=solves.slice(0,50).map(adjustedSolveMs).reverse().filter(Number.isFinite);
+  if(!values.length)return '<div class="graph-empty">NO TIMED SOLVES YET</div>';
+  const w=760,h=230,pad=28,min=Math.min(...values),max=Math.max(...values),span=Math.max(1,max-min);
+  const points=values.map((v,i)=>{const x=pad+(values.length===1?(w-pad*2)/2:i*(w-pad*2)/(values.length-1));const y=h-pad-((v-min)/span)*(h-pad*2);return [x,y,v]});
+  const line=points.map(x=>x[0].toFixed(1)+","+x[1].toFixed(1)).join(" ");
+  const dots=points.map(x=>`<circle cx="${x[0].toFixed(1)}" cy="${x[1].toFixed(1)}" r="3"><title>${fmt(x[2])}</title></circle>`).join("");
+  return `<div class="time-graph-wrap"><svg class="time-graph" viewBox="0 0 ${w} ${h}" role="img" aria-label="Solve time graph"><line x1="${pad}" y1="${pad}" x2="${pad}" y2="${h-pad}" class="graph-axis"/><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" class="graph-axis"/><polyline points="${line}" class="graph-line" fill="none"/>${dots}<text x="${pad}" y="16" class="graph-label">${fmt(max)}</text><text x="${pad}" y="${h-6}" class="graph-label">${fmt(min)}</text><text x="${w-pad}" y="${h-6}" text-anchor="end" class="graph-label">LAST ${values.length}</text></svg></div>`;
+}
+async function solo(){
+  if(!s.scramble)await scr();
+  const all=await getSolves();
+  const a=all.filter(x=>x.puzzle===s.puzzle);
+  const valid=a.filter(x=>Number.isFinite(adjustedSolveMs(x)));
+  const averages=[5,12,50,100,1000];
+  v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · TOUCH TO START</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div class="stats-panel"><div class="stats-section-head"><div><div class="stats-kicker">CURRENT PUZZLE</div><h2>${s.puzzle==="333"?"3×3":"2×2"} STATISTICS</h2></div><span class="stats-note">LATEST SOLVES FIRST</span></div><div class="stats-grid stats-grid-wide"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${bestSolve(a)}</strong></div>${averages.map(n=>`<div class="stat-box"><small>AO${n}</small><strong>${rollingAverage(a,n)}</strong></div>`).join("")}</div><div class="graph-panel"><div class="graph-head"><div><div class="stats-kicker">TIME TREND</div><h3>LAST 50 SOLVES</h3></div><span class="stats-note">+2 INCLUDED · DNF EXCLUDED</span></div>${buildTimeGraph(a)}</div><div class="solves-list"><div class="solve-list-head"><span>RECENT SOLVES</span><span>${a.length} TOTAL</span></div>${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div></div>`);
+  bindSolo();
+}
+function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);document.querySelector("#tl").textContent=label}function stop(){cancelAnimationFrame(s.raf)}function loop(){const n=performance.now();if(s.phase==="inspection")set(Math.max(0,settings.inspection*1000-(n-s.inspectionStart)),"INSPECTION");if(s.phase==="solving")set(n-s.solveStart,"SOLVING");s.raf=requestAnimationFrame(loop)}function press(){if(s.phase==="ready"||s.phase==="stopped"){s.phase="inspection";s.inspectionStart=performance.now();loop();return}if(s.phase==="inspection"){const e=performance.now()-s.inspectionStart;s.penalty=e>=17000?"DNF":e>=15000?"+2":"";s.phase="solving";s.solveStart=performance.now();return}if(s.phase==="solving")finish()}async function finish(){const ms=performance.now()-s.solveStart;stop();s.phase="stopped";const display=s.penalty==="DNF"?"DNF":fmt(ms+(s.penalty==="+2"?2000:0));s.last={display};await addSolve({id:crypto.randomUUID(),createdAt:Date.now(),puzzle:s.puzzle,scramble:s.scramble,timeMs:ms,penalty:s.penalty,display});toast(display);setTimeout(async()=>{s.phase="ready";await scr();solo()},300)}function bindSolo(){
+  mountCube();
+  document.querySelector("#new").onclick=async()=>{stop();s.phase="ready";await scr();solo()};
+  document.querySelector("#p").onchange=async e=>{s.puzzle=e.target.value;stop();s.phase="ready";await scr();solo()};
+  document.querySelector("#copy").onclick=()=>navigator.clipboard?.writeText(s.scramble).then(()=>toast("SCRAMBLE COPIED"));
+  document.querySelector("#zone").onpointerdown=()=>press();
+  if(window._cubeClashSoloKeyHandler)document.removeEventListener("keydown",window._cubeClashSoloKeyHandler,true);
+  if(window._cubeClashSoloKeyUpHandler)document.removeEventListener("keyup",window._cubeClashSoloKeyUpHandler,true);
+  let held=false,holdFired=false,timer=0;
+  const keyDown=e=>{
+    if((e.code!=="Space"&&e.code!=="Enter")||e.repeat)return;
+    e.preventDefault();
+    if(s.phase==="ready"||s.phase==="stopped"){press();return;}
+    if(s.phase==="inspection"){
+      held=true;holdFired=false;clearTimeout(timer);
+      timer=setTimeout(()=>{holdFired=true;if(s.phase==="inspection")set("0","RELEASE TO START")},600);
+    }
+  };
+  const keyUp=e=>{
+    if((e.code!=="Space"&&e.code!=="Enter")||!held)return;
+    e.preventDefault();clearTimeout(timer);held=false;
+    if(s.phase==="inspection"){if(holdFired){press()}else toast("HOLD SPACE TO START SOLVE");}
+    else if(s.phase==="solving")press();
+    holdFired=false;
+  };
+  document.addEventListener("keydown",keyDown,true);document.addEventListener("keyup",keyUp,true);
+  window._cubeClashSoloKeyHandler=keyDown;window._cubeClashSoloKeyUpHandler=keyUp;
+}
 function tutorial(){v(`<div class="tutorial-screen"><div class="tutorial-card"><div class="tutorial-kicker">FIRST TIME SETUP / 01</div><h1 class="tutorial-title">HOW CUBECLASH WORKS</h1><p class="tutorial-intro">A quick guide before you start. You can reopen this tutorial later from the menu.</p><div class="tutorial-steps"><article><span>01</span><h2>CHOOSE A PUZZLE</h2><p>Select 2×2 or 3×3. CubeClash generates a new random-state scramble for every solve.</p></article><article><span>02</span><h2>READ THE SCRAMBLE</h2><p>The 3D cube shows the exact state produced by the scramble, so the visual matches the moves shown above it.</p></article><article><span>03</span><h2>INSPECTION</h2><p>Press Space, Enter, or touch the timer to begin inspection. Under 15 seconds is normal, 15 to under 17 seconds is +2, and 17 seconds or more is DNF.</p></article><article><span>04</span><h2>SOLVE</h2><p>Press again to start the solve, then press again when you finish. Your result is saved on this device.</p></article><article><span>05</span><h2>1V1 ROOMS</h2><p>For beta, rooms use a browser-to-browser WebRTC connection. The host and guest exchange connection data to connect.</p></article><article><span>06</span><h2>YOUR DATA</h2><p>Solves and settings stay in your browser. Use JSON export if you want a backup or to move your timer data.</p></article></div><div class="tutorial-actions"><button class="primary-btn" id="tutorialStart">I UNDERSTAND — OPEN MENU</button></div></div></div>`);document.querySelector("#tutorialStart").onclick=()=>{localStorage.setItem("cubeclash-tutorial-seen","1");home()}}
 function dashboard(){v(`<div class="hero"><div class="hero-grid"><div><div class="section-title"><small>01 / SPEEDCUBING PLATFORM</small><small>BETA</small></div><h1 class="hero-title cube-font">CUBE<span>CLASH</span></h1><p class="hero-copy">A smooth responsive 2×2 and 3×3 speedcubing timer with random-state scrambles, real 3D scramble visualization, local history, installable PWA support, and peer-to-peer 1v1 rooms.</p><div class="hero-actions"><button class="primary-btn" data-view="solo">SOLO TIMER</button><button class="ghost-btn" data-view="room">CREATE / JOIN 1V1</button></div></div><div class="technical-card"><div class="spec-list"><div class="spec"><span>PUZZLES</span><span>2×2 / 3×3</span></div><div class="spec"><span>SCRAMBLES</span><span>RANDOM-STATE</span></div><div class="spec"><span>SYNC</span><span>WEBRTC P2P</span></div><div class="spec"><span>STORAGE</span><span>INDEXEDDB</span></div><div class="spec"><span>INSTALL</span><span>PWA</span></div></div></div></div></div>`)}
 function home(){v(`<div class="menu-screen"><div class="menu-wrap"><section class="menu-main"><div class="menu-content"><div class="menu-kicker">WELCOME / CUBECLASH BETA</div><h1 class="menu-title">CUBE<span>CLASH</span></h1><p class="menu-sub">A competitive speedcubing platform for 2×2 and 3×3. Choose your appearance, then enter the timer or a 1v1 room.</p><div class="menu-actions"><button class="menu-action" data-view="solo"><span>SOLO TIMER</span><span class="arrow">→</span></button><button class="menu-action" data-view="room"><span>CREATE / JOIN 1V1</span><span class="arrow">→</span></button><button class="menu-action" data-view="settings"><span>SETTINGS</span><span class="arrow">→</span></button></div></div></section></div></div>`);applyTheme(currentTheme())}
@@ -221,10 +312,10 @@ function copyText(text){
 }
 function wireRoom(){
   if(s.room._wired)return; s.room._wired=true;
-  s.room.on("state",state=>{
+  s.room.on("state",async state=>{
     if(state==="connected"){
       if(s.role==="host"){
-        if(!s.scramble)s.scramble=randomScramble();
+        if(!s.scramble)s.scramble=await randomScramble();
         try{s.room.send({type:"match-config",match:{...s.match,puzzle:s.puzzle,names:{host:settings.name||"PLAYER 1",guest:"PLAYER 2"}},scramble:s.scramble,history:s.matchHistory})}catch(e){console.error(e)}
       }else{
         try{s.room.send({type:"player-name",name:settings.name||"PLAYER 2"})}catch(e){console.error(e)}
@@ -234,10 +325,10 @@ function wireRoom(){
     if(state==="camera-requested"&&s.localStream){try{s.room.answerWithMedia(s.localStream)}catch(e){console.error(e)}}
     if(state==="closed")showRoomStatus("PLAYER DISCONNECTED","The peer connection closed.","error");
     if(state==="signaling-disconnected")showRoomStatus("SIGNALING DISCONNECTED","The signaling service was lost. The current peer connection may continue.","error");
-  }).on("message",msg=>{
+  }).on("message",async msg=>{
     if(!msg||typeof msg!=="object")return;
     if(msg.type==="match-config"&&s.role==="guest"){
-      s.match=msg.match; s.matchHistory=Array.isArray(msg.history)?msg.history.slice().sort((a,b)=>a.round-b.round):[]; s.puzzle=msg.match.puzzle; s.scramble=msg.scramble||randomScramble();
+      s.match=msg.match; s.matchHistory=Array.isArray(msg.history)?msg.history.slice().sort((a,b)=>a.round-b.round):[]; s.puzzle=msg.match.puzzle; s.scramble=msg.scramble||await randomScramble();
       renderMatch(true); setTimeout(()=>showCameraPermission(),0); toast("MATCH READY"); return;
     }
     if(msg.type==="player-name"&&s.role==="host"){
@@ -286,7 +377,7 @@ function wireRoom(){
       if(msg.round===s.match?.round && s.nextRoundReady && s.remoteNextRoundReady && s.match.round<(s.match.rounds||1))advanceRound();
     }
     if(msg.type==="next-round"){
-      s.match.round=msg.round; s.match.score=msg.score||s.match.score; if(Array.isArray(msg.history))s.matchHistory=msg.history.slice().sort((a,b)=>a.round-b.round); s.scramble=msg.scramble||randomScramble(); s.nextRoundReady=false;s.remoteNextRoundReady=false; resetMatchRound();
+      s.match.round=msg.round; s.match.score=msg.score||s.match.score; if(Array.isArray(msg.history))s.matchHistory=msg.history.slice().sort((a,b)=>a.round-b.round); s.scramble=msg.scramble||await randomScramble(); s.nextRoundReady=false;s.remoteNextRoundReady=false; resetMatchRound();
     }
     if(msg.type==="match-history"){
       if(Array.isArray(msg.history)){s.matchHistory=msg.history.slice().sort((a,b)=>a.round-b.round);updateMatchUI();}
@@ -354,27 +445,28 @@ function faceletGrid(size,stickers,face){
 }
 function render2DScramble(){
   const root=document.querySelector("#scramble2DVisual"); if(!root)return;
-  const size=s.puzzle==="222"?2:3, state=buildCubeState(size,s.scramble), by={U:[],D:[],F:[],B:[],R:[],L:[]};
+  const size=s.puzzle==="222"?2:3;
+  const state=buildCubeState(size,s.scramble||"");
+  const by={U:[],D:[],F:[],B:[],R:[],L:[]};
   const normals={U:[0,1,0],D:[0,-1,0],F:[0,0,1],B:[0,0,-1],R:[1,0,0],L:[-1,0,0]};
   for(const c of state){
     for(const sticker of c.stickers){
       const normal=sticker.normal, color=sticker.color;
-      for(const [face,n] of Object.entries(normals)){
-        if(normal[0]===n[0]&&normal[1]===n[1]&&normal[2]===n[2]){
-          by[face].push([c.p,normal,color]);
-          break;
-        }
+      for(const face of Object.keys(normals)){
+        const n=normals[face];
+        if(normal[0]===n[0]&&normal[1]===n[1]&&normal[2]===n[2]){by[face].push([c.p,normal,color]);break;}
       }
     }
   }
   const faces=["U","L","F","R","B","D"];
-  root.innerHTML=faces.map(face=>`<div class="net-face net-${face}" style="--n:${size}"><span class="net-label">${face}</span>${faceletGrid(size,by[face],face)}</div>`).join("");
+  root.dataset.puzzle=s.puzzle;
+  root.innerHTML=faces.map(face=>`<div class="net-face net-${face}" style="--n:${size}" data-face="${face}" aria-label="${face} face">${faceletGrid(size,by[face],face)}</div>`).join("");
 }
 function renderMatch(preconnect=false){
-  if(window._cubeClashMatchKeyHandler){document.removeEventListener("keydown",window._cubeClashMatchKeyHandler,true);window._cubeClashMatchKeyHandler=null;}
+  if(window._cubeClashMatchKeyHandler){document.removeEventListener("keydown",window._cubeClashMatchKeyHandler,true);document.removeEventListener("keyup",window._cubeClashMatchKeyHandler,true);window._cubeClashMatchKeyHandler=null;}
   const rounds=s.match?.rounds||1, round=s.match?.round||1, score=s.match?.score||[0,0];
   v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?(settings.name||"PLAYER 1")+" / HOST":(s.match?.names?.guest||"PLAYER 2")+" / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${round} / ${rounds}</span><span id="matchScore">${score[0]} — ${score[1]}</span><button class="ghost-btn" id="exitMatch">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">${s.localStream?"CAMERA + MIC READY":"CAMERA + MIC WAITING"}</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA + MIC</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?(settings.name||"PLAYER 1"):(s.match?.names?.guest||"PLAYER 2")}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div></div></div><div class="center-match"><div class="scramble-2d"><div class="scramble-2d-label">2D SCRAMBLE VISUALIZATION</div><div class="scramble-net" id="scramble2DVisual"></div><div class="center-scramble" id="matchScramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div></div><div class="match-instructions"><span class="desktop-only">SPACE / ENTER — INSPECTION → SOLVE → FINISH</span><span class="mobile-only">TAP TIMER — INSPECTION · LONG PRESS — START · TAP — FINISH</span></div><div class="match-timer-zone" id="matchTimerZone"><div class="match-main-timer" id="matchMainTimer">0.00</div><div class="match-main-label" id="matchMainLabel">READY</div></div><div class="round-result-panel" id="roundResultPanel" hidden><div class="round-result-title" id="roundResultTitle">ROUND RESULTS</div><div id="roundHistoryList" class="round-history-list"></div></div><div class="match-result-tools" id="matchResultTools" hidden><div class="penalty-label">RESULT ADJUSTMENT</div><div class="penalty-buttons"><button class="ghost-btn penalty-btn" id="penaltyPlus2">+2</button><button class="ghost-btn penalty-btn" id="penaltyDnf">DNF</button></div><div class="result-note" id="resultNote"></div></div><div class="match-controls"><span class="match-connection" id="matchConnection">${preconnect?"CONNECTING":"CONNECTED"}</span><span class="media-quality" id="mediaQuality">CONNECTION: ${s.mediaQuality||"FAIR"}</span><button class="ghost-btn" id="muteMic">MIC ON</button><button class="ghost-btn" id="nextRound" hidden>NEXT ROUND</button></div></div><div class="player-card"><div class="player-name">${s.role==="host"?(s.match?.names?.guest||"PLAYER 2"):(s.match?.names?.host||"PLAYER 1")}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA + MICROPHONE</div><h2>ALLOW CAMERA + MIC</h2><p>Both players are connected. Allow CubeClash to use your camera and microphone for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA + MIC</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA + MIC</button></div></div></div></div>`);
-  requestAnimationFrame(()=>{render2DScramble();setTimeout(render2DScramble,60);});
+  requestAnimationFrame(()=>{render2DScramble();setTimeout(render2DScramble,60);setTimeout(render2DScramble,220);});
   if(s.localStream){const lv=document.querySelector("#localVideo");if(lv)lv.srcObject=s.localStream}
   if(s.remoteStream){const rv=document.querySelector("#remoteVideo");if(rv)rv.srcObject=s.remoteStream}
   document.querySelector("#exitMatch").onclick=exitMatch;
@@ -410,15 +502,38 @@ function bindMatchTimer(){
   const keyHandler=e=>{
     if(mobile)return;
     if(!document.querySelector("#matchTimerZone"))return;
-    if((e.code==="Space"||e.code==="Enter")&&!e.repeat){
-      e.preventDefault(); e.stopPropagation(); matchToggle();
+    if(e.code!=="Space"&&e.code!=="Enter")return;
+    e.preventDefault(); e.stopPropagation();
+    if(e.type==="keydown"){
+      if(e.repeat)return;
+      if(s.matchPhase==="ready"||s.matchPhase==="finished"){matchInspection();return;}
+      if(s.matchPhase==="inspection"){
+        window._cubeClashDesktopHoldFired=false;
+        clearTimeout(window._cubeClashDesktopHoldTimer);
+        window._cubeClashDesktopHoldTimer=setTimeout(()=>{
+          window._cubeClashDesktopHoldFired=true;
+          if(s.matchPhase==="inspection")setMatchTimer((s.match?.inspection||15)*1000-(performance.now()-s.matchInspectionStart),"RELEASE TO START");
+        },600);
+      }
+    }else if(e.type==="keyup"){
+      clearTimeout(window._cubeClashDesktopHoldTimer);
+      const fired=!!window._cubeClashDesktopHoldFired;
+      window._cubeClashDesktopHoldFired=false;
+      if(s.matchPhase==="inspection"){
+        if(fired)matchStart();
+        else toast("HOLD SPACE TO START SOLVE");
+      }else if(s.matchPhase==="solving"){
+        matchFinish();
+      }
     }
   };
+  document.addEventListener("keyup",keyHandler,true);
   document.addEventListener("keydown",keyHandler,true);
   window._cubeClashMatchKeyHandler=keyHandler;
 }
 
 function cleanupMatchMedia(){
+  clearTimeout(window._cubeClashDesktopHoldTimer); window._cubeClashDesktopHold=false; window._cubeClashDesktopHoldFired=false;
   try{
     if(s.mediaStatsRaf)clearTimeout(s.mediaStatsRaf);
     s.mediaStatsRaf=0;
@@ -588,11 +703,11 @@ function nextRound(){
   try{s.room.send({type:"next-round-ready",round:s.match.round})}catch{}
   if(s.remoteNextRoundReady)advanceRound();
 }
-function advanceRound(){
+async function advanceRound(){
   if(!s.nextRoundReady||!s.remoteNextRoundReady)return;
   if(s.match.round>=(s.match.rounds||1)){s.match.status="FINISHED";try{s.room.send({type:"match-over",winner:s.roundResult?.winner||"DRAW",history:s.matchHistory})}catch{}updateMatchUI();return;}
   if(s.role==="host"){
-    s.match.round++; s.match.status="PLAYING"; s.scramble=randomScramble(); s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.opponent={time:"0.00",status:"WAITING"};s.nextRoundReady=false;s.remoteNextRoundReady=false;s.advanceRequested=false;s._roundResolved=null;
+    s.match.round++; s.match.status="PLAYING"; s.scramble=await randomScramble(); s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.opponent={time:"0.00",status:"WAITING"};s.nextRoundReady=false;s.remoteNextRoundReady=false;s.advanceRequested=false;s._roundResolved=null;
     try{s.room.send({type:"next-round",round:s.match.round,score:s.match.score,scramble:s.scramble,history:s.matchHistory})}catch{}
     resetMatchRound();
   }else{try{s.room.send({type:"next-round-request",round:s.match.round})}catch{}}
@@ -603,6 +718,8 @@ function resetMatchRound(){
 
 function settingsView(){v(`<div class="section-title"><h1>SETTINGS</h1><small>LOCAL DEVICE</small></div><div class="settings-grid"><div class="setting-card"><h2>APPEARANCE</h2><div class="theme-options" style="margin-top:14px"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div></div><div class="setting-card"><h2>PROFILE</h2><div class="field"><label>DISPLAY NAME</label><input id="displayName" maxlength="24" value="${esc(settings.name||"")}" placeholder="YOUR NAME" autocomplete="nickname"></div><p style="color:#666;font-size:12px;line-height:1.6">Your name is shown to the other player during 1v1 matches.</p></div><div class="setting-card creator-card"><h2>CREATOR</h2><div class="creator-name">SID ANAJAO</div><p>Created and developed by Sid Anajao.</p></div><div class="setting-card"><h2>TIMER</h2><div class="field"><label>INSPECTION SECONDS</label><select id="ins"><option ${settings.inspection===0?"selected":""}>0</option><option ${settings.inspection===10?"selected":""}>10</option><option ${settings.inspection===15?"selected":""}>15</option></select></div><div class="room-actions"><button class="primary-btn" id="save">SAVE SETTINGS</button></div></div><div class="setting-card"><h2>DATA</h2><p style="color:#666;font-size:12px;line-height:1.6">Solves are stored locally in IndexedDB. Export your times before clearing browser data or moving to another device.</p><div class="room-actions"><button class="ghost-btn" id="ex">EXPORT JSON</button><label class="ghost-btn" style="display:grid;place-items:center;cursor:pointer">IMPORT JSON<input id="im" type="file" accept=".json" hidden></label><button class="danger-btn" id="cl">CLEAR SOLVES</button></div></div><div class="setting-card wipe-card"><h2>RESET / UPDATE</h2><p style="color:#666;font-size:12px;line-height:1.6">Use this when a new CubeClash update is installed and the old service worker or cached files are causing problems. CubeClash will automatically download a JSON backup of your solve history first, then clear local app data, caches, and the service worker.</p><div class="room-actions"><button class="danger-btn" id="wipeAll">EXPORT + WIPE APP DATA</button></div></div></div>`);bindTheme();applyTheme(localStorage.getItem("cubeclash-theme")||"dark");document.querySelector("#save").onclick=()=>{settings.inspection=+document.querySelector("#ins").value;settings.name=(document.querySelector("#displayName")?.value||"").trim().slice(0,24);const selected=document.querySelector(".theme-option.active")?.dataset.theme||currentTheme();applyTheme(selected);localStorage.setItem("cubeclash-settings",JSON.stringify(settings));toast("SETTINGS SAVED")};document.querySelector("#ex").onclick=async()=>{const b=new Blob([JSON.stringify(await exportData(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`cubeclash-${Date.now()}.json`;a.click()};document.querySelector("#im").onchange=async e=>{try{await importData(JSON.parse(await e.target.files[0].text()));toast("DATA IMPORTED")}catch{toast("IMPORT FAILED")}};document.querySelector("#cl").onclick=async()=>{if(confirm("Clear all local solves? This cannot be undone unless you exported them.")){await clearSolves();toast("SOLVES CLEARED")}};document.querySelector("#wipeAll").onclick=async()=>{if(!confirm("CubeClash will export your solve history and then clear local app data, cache, settings, and service worker. Continue?"))return;try{await wipeCubeClashData({downloadBackup:true});alert("Backup downloaded. CubeClash will reload with a clean installation.");location.reload()}catch(e){console.error(e);toast("RESET FAILED")}}}
 async function nav(x){
+  if(window._cubeClashSoloKeyHandler){document.removeEventListener("keydown",window._cubeClashSoloKeyHandler,true);window._cubeClashSoloKeyHandler=null;}
+  if(window._cubeClashSoloKeyUpHandler){document.removeEventListener("keyup",window._cubeClashSoloKeyUpHandler,true);window._cubeClashSoloKeyUpHandler=null;}
   if(s.room||s.localStream||s.remoteStream)cleanupMatchMedia();
   s.room=null;s.role=null;s.roomCode="";
   if(x==="home")home();
