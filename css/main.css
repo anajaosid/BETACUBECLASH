@@ -120,3 +120,8 @@ body{letter-spacing:normal}
 .sticker-face{position:absolute;left:3px;top:3px;width:calc(100% - 6px);height:calc(100% - 6px);border-radius:10%;border:2px solid #1118;backface-visibility:hidden;box-shadow:inset 2px 2px 4px #fff4,inset -3px -3px 5px #0005,0 2px 3px #0007}
 @media(max-width:900px){.cube3d-wrap{min-height:420px}}
 @media(max-width:520px){.cube3d-wrap{min-height:350px}}
+.round-result-panel{margin:18px 0;border:1px solid currentColor;padding:18px 20px;background:rgba(127,127,127,.06)}
+.round-result-title{font-size:11px;letter-spacing:.14em;font-weight:700;margin-bottom:14px;text-align:center;opacity:.7}
+.round-result-players{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;gap:18px}
+.round-result-player{text-align:center;min-width:0}.round-result-name{font-size:12px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.round-result-time{font-family:var(--mono,monospace);font-size:clamp(24px,4vw,42px);font-weight:700;margin-top:5px}.round-result-difference{font-family:var(--mono,monospace);font-size:11px;letter-spacing:.08em;text-align:center;opacity:.7}
+@media(max-width:600px){.round-result-players{gap:8px}.round-result-time{font-size:24px}.round-result-difference{font-size:9px}}

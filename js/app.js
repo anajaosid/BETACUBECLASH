@@ -102,65 +102,72 @@ function stickerTransform(normal,d){
   return `rotateY(180deg) translateZ(${d}px)`;
 }
 
-function renderCube(){
-  const root=document.querySelector("#cube3d");
-  if(!root)return;
-  const size=s.puzzle==="222"?2:3;
-  const audit=auditCubeEngine(size,s.scramble);
-  root.dataset.engineAudit=audit?"pass":"fail";
-
-  // The whole puzzle is kept almost the same visual size for both puzzles.
-  // 2x2 uses larger cubies because it has only two pieces per axis.
-  const cubie=size===2?76:49;
-  const gap=size===2?4:3;
-  const pitch=cubie+gap;
-  const half=cubie/2;
-  const state=buildCubeState(size,s.scramble);
-  const faceByColor={R:"R",O:"L",W:"U",Y:"D",G:"F",B:"B"};
+function makeCubePiece(cubie,size,half,stickers,pieceStyle){
+  const piece=document.createElement("div");
+  piece.className="cubelet";
+  piece.style.cssText=pieceStyle;
   const faces=[
-    {name:"R",normal:[1,0,0],transform:"rotateY(90deg)"},
-    {name:"L",normal:[-1,0,0],transform:"rotateY(-90deg)"},
-    {name:"U",normal:[0,1,0],transform:"rotateX(90deg)"},
-    {name:"D",normal:[0,-1,0],transform:"rotateX(-90deg)"},
-    {name:"F",normal:[0,0,1],transform:"translateZ(0)"},
-    {name:"B",normal:[0,0,-1],transform:"rotateY(180deg)"}
+    {normal:[1,0,0],transform:"rotateY(90deg)"},{normal:[-1,0,0],transform:"rotateY(-90deg)"},
+    {normal:[0,1,0],transform:"rotateX(90deg)"},{normal:[0,-1,0],transform:"rotateX(-90deg)"},
+    {normal:[0,0,1],transform:"translateZ(0)"},{normal:[0,0,-1],transform:"rotateY(180deg)"}
   ];
-
-  root.innerHTML="";
-  root.style.cssText=`position:relative;width:100%;height:100%;min-height:420px;display:grid;place-items:center;perspective:1100px;perspective-origin:50% 50%;overflow:hidden;touch-action:none;user-select:none;`;
-  const model=document.createElement("div");
-  model.className="cube-model";
-  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-27deg) rotateY(-37deg);will-change:transform;`;
-  root.appendChild(model);
-
-  for(const c of state){
-    const piece=document.createElement("div");
-    piece.className="cubelet";
-    piece.style.cssText=`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;transform-style:preserve-3d;transform:translate3d(${c.p[0]*pitch}px,${-c.p[1]*pitch}px,${c.p[2]*pitch}px);background:#141414;border:2px solid #050505;border-radius:${Math.max(5,cubie*.085)}px;box-shadow:inset 0 0 0 1px #3d3d3d,inset 0 -5px 10px #000b,0 4px 8px #0008;`;
-    const stickers=new Map(c.stickers.map(st=>[st.normal.join(","),st.color]));
-
-    for(const f of faces){
-      const faceEl=document.createElement("div");
-      faceEl.style.cssText=`position:absolute;inset:0;width:${cubie}px;height:${cubie}px;box-sizing:border-box;background:#171717;border:1px solid #050505;border-radius:${Math.max(4,cubie*.065)}px;backface-visibility:hidden;transform:${f.transform} translateZ(${half}px);`;
-      const color=stickers.get(f.normal.join(","));
-      if(color){
-        const inset=Math.max(5,cubie*.095);
-        const sticker=document.createElement("div");
-        sticker.className=`sticker-face sticker-${color}`;
-        sticker.style.cssText=`position:absolute;left:${inset}px;top:${inset}px;width:${cubie-inset*2}px;height:${cubie-inset*2}px;box-sizing:border-box;background:${COLOR_HEX[color]};border:2px solid rgba(0,0,0,.38);border-radius:${Math.max(4,cubie*.065)}px;box-shadow:inset 2px 2px 4px rgba(255,255,255,.22),inset -3px -3px 5px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.55);transform:translateZ(2px);`;
-        faceEl.appendChild(sticker);
-      }
-      piece.appendChild(faceEl);
+  for(const f of faces){
+    const faceEl=document.createElement("div");
+    faceEl.style.cssText=`position:absolute;inset:0;width:${cubie}px;height:${cubie}px;box-sizing:border-box;background:#111;border:1px solid #050505;border-radius:${Math.max(3,cubie*.045)}px;backface-visibility:hidden;transform:${f.transform} translateZ(${half}px);`;
+    const color=stickers.get(f.normal.join(","));
+    if(color){
+      const inset=size===2?Math.max(6,cubie*.075):Math.max(5,cubie*.085);
+      const sticker=document.createElement("div");
+      sticker.style.cssText=`position:absolute;left:${inset}px;top:${inset}px;width:${cubie-inset*2}px;height:${cubie-inset*2}px;box-sizing:border-box;background:${COLOR_HEX[color]};border:2px solid rgba(0,0,0,.32);border-radius:${Math.max(3,cubie*.05)}px;box-shadow:inset 2px 2px 4px rgba(255,255,255,.2),inset -3px -3px 5px rgba(0,0,0,.26),0 1px 2px rgba(0,0,0,.55);transform:translateZ(2px);`;
+      faceEl.appendChild(sticker);
     }
+    piece.appendChild(faceEl);
+  }
+  return piece;
+}
+function render222Cube(root){
+  const size=2,state=buildCubeState(2,s.scramble);
+  const cubie=82,gap=4,pitch=cubie+gap,half=cubie/2;
+  root.innerHTML="";
+  root.style.cssText=`position:relative;width:100%;height:100%;min-height:420px;display:grid;place-items:center;perspective:1250px;overflow:hidden;touch-action:none;user-select:none;`;
+  const model=document.createElement("div");model.className="cube-model cube-model-222";
+  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-24deg) rotateY(-35deg);will-change:transform;`;
+  root.appendChild(model);
+  for(const c of state){
+    const stickers=new Map(c.stickers.map(st=>[st.normal.join(","),st.color]));
+    const piece=makeCubePiece(c,size,half,stickers,`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;transform-style:preserve-3d;transform:translate3d(${c.p[0]*pitch}px,${-c.p[1]*pitch}px,${c.p[2]*pitch}px);background:#111;border:2px solid #030303;border-radius:9px;box-shadow:inset 0 0 0 1px #383838,inset 0 -7px 12px #000b,0 5px 10px #0009;`);
     model.appendChild(piece);
   }
-
-  let dragging=false,sx=0,sy=0,rx=-27,ry=-37;
+  bindCubeDrag(root,model,-24,-35);
+}
+function render333Cube(root){
+  const size=3,state=buildCubeState(3,s.scramble);
+  const cubie=54,gap=3,pitch=cubie+gap,half=cubie/2;
+  root.innerHTML="";
+  root.style.cssText=`position:relative;width:100%;height:100%;min-height:420px;display:grid;place-items:center;perspective:1250px;overflow:hidden;touch-action:none;user-select:none;`;
+  const model=document.createElement("div");model.className="cube-model cube-model-333";
+  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-25deg) rotateY(-36deg);will-change:transform;`;
+  root.appendChild(model);
+  for(const c of state){
+    const stickers=new Map(c.stickers.map(st=>[st.normal.join(","),st.color]));
+    const piece=makeCubePiece(c,size,half,stickers,`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;transform-style:preserve-3d;transform:translate3d(${c.p[0]*pitch}px,${-c.p[1]*pitch}px,${c.p[2]*pitch}px);background:#111;border:2px solid #030303;border-radius:7px;box-shadow:inset 0 0 0 1px #383838,inset 0 -5px 9px #000b,0 4px 8px #0008;`);
+    model.appendChild(piece);
+  }
+  bindCubeDrag(root,model,-25,-36);
+}
+function bindCubeDrag(root,model,rx0,ry0){
+  let dragging=false,sx=0,sy=0,rx=rx0,ry=ry0;
   root.style.cursor="grab";
   root.onpointerdown=e=>{dragging=true;sx=e.clientX;sy=e.clientY;root.setPointerCapture?.(e.pointerId);root.style.cursor="grabbing"};
-  root.onpointermove=e=>{if(!dragging)return;const dx=e.clientX-sx,dy=e.clientY-sy;model.style.transform=`rotateX(${rx-dy*.32}deg) rotateY(${ry+dx*.32}deg)`};
-  const end=e=>{dragging=false;root.style.cursor="grab";if(e?.pointerId!=null)try{root.releasePointerCapture(e.pointerId)}catch{}};
+  root.onpointermove=e=>{if(!dragging)return;const dx=e.clientX-sx,dy=e.clientY-sy;model.style.transform=`rotateX(${rx-dy*.3}deg) rotateY(${ry+dx*.3}deg)`};
+  const end=e=>{if(!dragging)return;dragging=false;root.style.cursor="grab";if(e?.pointerId!=null)try{root.releasePointerCapture(e.pointerId)}catch{}};
   root.onpointerup=end;root.onpointercancel=end;
+}
+function renderCube(){
+  const root=document.querySelector("#cube3d");if(!root)return;
+  const size=s.puzzle==="222"?2:3;
+  const audit=auditCubeEngine(size,s.scramble);root.dataset.engineAudit=audit?"pass":"fail";
+  if(size===2)render222Cube(root);else render333Cube(root);
 }
 async function mountCube(){try{renderCube()}catch(err){console.error("CubeClash cube renderer error:",err);const h=document.querySelector("#cube3d");if(h)h.innerHTML=`<div class="cube-error"><strong>3D CUBE ERROR</strong><span>${esc(err.message||String(err))}</span></div>`}}
 async function solo(){if(!s.scramble)await scr();const a=await getSolves(),valid=a.filter(x=>x.penalty!=="DNF").map(x=>x.timeMs+(x.penalty==="+2"?2000:0));const avg=n=>valid.length>=n?fmt(valid.slice(0,n).reduce((a,b)=>a+b,0)/n):"—";v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · TOUCH TO START</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div class="stats-panel"><div class="stats-grid"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${valid.length?fmt(Math.min(...valid)):"—"}</strong></div><div class="stat-box"><small>AO5</small><strong>${avg(5)}</strong></div><div class="stat-box"><small>AO12</small><strong>${avg(12)}</strong></div></div><div class="solves-list">${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div></div>`);bindSolo()}
@@ -259,7 +266,10 @@ function wireRoom(){
       if(msg.round===s.match?.round){s.roundResult=msg;updateMatchUI();}
     }
     if(msg.type==="next-round-ready"){
-      if(msg.round===s.match?.round){s.remoteNextRoundReady=true;updateMatchUI();if(s.nextRoundReady)advanceRound();}
+      if(msg.round===s.match?.round){s.remoteNextRoundReady=true;updateMatchUI();}
+    }
+    if(msg.type==="next-round-request"){
+      if(msg.round===s.match?.round && s.nextRoundReady && s.remoteNextRoundReady && s.match.round<(s.match.rounds||1))advanceRound();
     }
     if(msg.type==="next-round"){
       s.match.round=msg.round; s.match.score=msg.score||s.match.score; s.scramble=msg.scramble||randomScramble(); s.nextRoundReady=false;s.remoteNextRoundReady=false; resetMatchRound();
@@ -335,12 +345,12 @@ function render2DScramble(){
 function renderMatch(preconnect=false){
   if(window._cubeClashMatchKeyHandler){document.removeEventListener("keydown",window._cubeClashMatchKeyHandler,true);window._cubeClashMatchKeyHandler=null;}
   const rounds=s.match?.rounds||1, round=s.match?.round||1, score=s.match?.score||[0,0];
-  v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?(settings.name||"PLAYER 1")+" / HOST":(s.match?.names?.guest||"PLAYER 2")+" / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${round} / ${rounds}</span><span id="matchScore">${score[0]} — ${score[1]}</span><button class="ghost-btn" id="exitMatch">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">${s.localStream?"CAMERA + MIC READY":"CAMERA + MIC WAITING"}</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA + MIC</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?(settings.name||"PLAYER 1"):(s.match?.names?.guest||"PLAYER 2")}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div></div></div><div class="center-match"><div class="scramble-2d"><div class="scramble-2d-label">2D SCRAMBLE VISUALIZATION</div><div class="scramble-net" id="scramble2DVisual"></div><div class="center-scramble" id="matchScramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div></div><div class="match-instructions"><span class="desktop-only">SPACE / ENTER — INSPECTION → SOLVE → FINISH</span><span class="mobile-only">TAP TIMER — INSPECTION · LONG PRESS — START · TAP — FINISH</span></div><div class="match-timer-zone" id="matchTimerZone"><div class="match-main-timer" id="matchMainTimer">0.00</div><div class="match-main-label" id="matchMainLabel">READY</div></div><div class="match-result-tools" id="matchResultTools" hidden><div class="penalty-label">RESULT ADJUSTMENT</div><div class="penalty-buttons"><button class="ghost-btn penalty-btn" id="penaltyPlus2">+2</button><button class="ghost-btn penalty-btn" id="penaltyDnf">DNF</button></div><div class="result-note" id="resultNote"></div></div><div class="match-controls"><span class="match-connection" id="matchConnection">${preconnect?"CONNECTING":"CONNECTED"}</span><span class="media-quality" id="mediaQuality">CONNECTION: ${s.mediaQuality||"FAIR"}</span><button class="ghost-btn" id="muteMic">MIC ON</button><button class="ghost-btn" id="nextRound" hidden>NEXT ROUND</button></div></div><div class="player-card"><div class="player-name">${s.role==="host"?(s.match?.names?.guest||"PLAYER 2"):(s.match?.names?.host||"PLAYER 1")}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA + MICROPHONE</div><h2>ALLOW CAMERA + MIC</h2><p>Both players are connected. Allow CubeClash to use your camera and microphone for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA + MIC</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA + MIC</button></div></div></div></div>`);
+  v(`<div class="match-page"><div class="match-head"><div><div class="section-title" style="margin:0"><h1>1V1 MATCH</h1><small>${s.role==="host"?(settings.name||"PLAYER 1")+" / HOST":(s.match?.names?.guest||"PLAYER 2")+" / GUEST"}</small></div></div><div class="match-meta"><span id="matchRound">ROUND ${round} / ${rounds}</span><span id="matchScore">${score[0]} — ${score[1]}</span><button class="ghost-btn" id="exitMatch">EXIT</button></div></div><div class="video-row"><div class="video-card"><div class="video-label">YOU</div><video id="localVideo" autoplay muted playsinline></video><div class="video-state" id="localCamState">${s.localStream?"CAMERA + MIC READY":"CAMERA + MIC WAITING"}</div></div><div class="video-card"><div class="video-label">OPPONENT</div><video id="remoteVideo" autoplay playsinline></video><div class="video-state" id="remoteCamState">WAITING FOR CAMERA + MIC</div></div></div><div class="match-grid"><div class="player-card"><div class="player-name">${s.role==="host"?(settings.name||"PLAYER 1"):(s.match?.names?.guest||"PLAYER 2")}</div><div class="player-state"><div class="player-timer" id="myTimer">0.00</div><small id="myState">READY</small></div><div></div></div><div class="center-match"><div class="scramble-2d"><div class="scramble-2d-label">2D SCRAMBLE VISUALIZATION</div><div class="scramble-net" id="scramble2DVisual"></div><div class="center-scramble" id="matchScramble">${esc(s.scramble||"WAITING FOR SCRAMBLE")}</div></div><div class="match-instructions"><span class="desktop-only">SPACE / ENTER — INSPECTION → SOLVE → FINISH</span><span class="mobile-only">TAP TIMER — INSPECTION · LONG PRESS — START · TAP — FINISH</span></div><div class="match-timer-zone" id="matchTimerZone"><div class="match-main-timer" id="matchMainTimer">0.00</div><div class="match-main-label" id="matchMainLabel">READY</div></div><div class="round-result-panel" id="roundResultPanel" hidden><div class="round-result-title">ROUND RESULT</div><div class="round-result-players"><div class="round-result-player"><div class="round-result-name" id="resultP1Name">PLAYER 1</div><div class="round-result-time" id="resultP1Time">—</div></div><div class="round-result-difference" id="resultDifference">—</div><div class="round-result-player"><div class="round-result-name" id="resultP2Name">PLAYER 2</div><div class="round-result-time" id="resultP2Time">—</div></div></div></div><div class="match-result-tools" id="matchResultTools" hidden><div class="penalty-label">RESULT ADJUSTMENT</div><div class="penalty-buttons"><button class="ghost-btn penalty-btn" id="penaltyPlus2">+2</button><button class="ghost-btn penalty-btn" id="penaltyDnf">DNF</button></div><div class="result-note" id="resultNote"></div></div><div class="match-controls"><span class="match-connection" id="matchConnection">${preconnect?"CONNECTING":"CONNECTED"}</span><span class="media-quality" id="mediaQuality">CONNECTION: ${s.mediaQuality||"FAIR"}</span><button class="ghost-btn" id="muteMic">MIC ON</button><button class="ghost-btn" id="nextRound" hidden>FINISH</button></div></div><div class="player-card"><div class="player-name">${s.role==="host"?(s.match?.names?.guest||"PLAYER 2"):(s.match?.names?.host||"PLAYER 1")}</div><div class="player-state"><div class="player-timer" id="oppTimer">${s.opponent.time||"0.00"}</div><small id="oppState">${s.opponent.status||"WAITING"}</small></div><div></div></div></div><div class="camera-modal" id="cameraModal" hidden><div class="camera-modal-card"><div class="room-code-label">MATCH CAMERA + MICROPHONE</div><h2>ALLOW CAMERA + MIC</h2><p>Both players are connected. Allow CubeClash to use your camera and microphone for the 1v1 match.</p><div class="room-actions"><button class="primary-btn" id="allowCamera">ALLOW CAMERA + MIC</button><button class="ghost-btn" id="skipCamera">CONTINUE WITHOUT CAMERA + MIC</button></div></div></div></div>`);
   requestAnimationFrame(()=>{render2DScramble();setTimeout(render2DScramble,60);});
   if(s.localStream){const lv=document.querySelector("#localVideo");if(lv)lv.srcObject=s.localStream}
   if(s.remoteStream){const rv=document.querySelector("#remoteVideo");if(rv)rv.srcObject=s.remoteStream}
   document.querySelector("#exitMatch").onclick=exitMatch;
-  document.querySelector("#nextRound").onclick=nextRound;
+  document.querySelector("#nextRound").onclick=()=>{if(s.nextRoundReady&&s.remoteNextRoundReady){advanceRound()}else{nextRound()}};
   document.querySelector("#penaltyPlus2").onclick=()=>setMatchPenalty("+2");
   document.querySelector("#penaltyDnf").onclick=()=>setMatchPenalty("DNF");
   document.querySelector("#muteMic").onclick=toggleMic;
@@ -421,10 +431,23 @@ function updateMatchUI(){
   const t=document.querySelector("#oppTimer"),st=document.querySelector("#oppState"),sc=document.querySelector("#matchScore"),r=document.querySelector("#matchRound"),mt=document.querySelector("#matchMainTimer"),ml=document.querySelector("#matchMainLabel");
   if(t)t.textContent=s.opponent.time||"0.00"; if(st)st.textContent=s.opponent.status||"WAITING"; if(sc)sc.textContent=`${s.match?.score?.[0]||0} — ${s.match?.score?.[1]||0}`; if(r)r.textContent=`ROUND ${s.match?.round||1} / ${s.match?.rounds||1}`;
   if(mt&&s.matchPhase==="ready")mt.textContent="0.00"; if(ml)ml.textContent=s.matchPhase==="inspection"?"INSPECTION":s.matchPhase==="solving"?"SOLVING":s.matchPhase==="finished"?"FINISHED":"READY";
-  const nr=document.querySelector("#nextRound"), tools=document.querySelector("#matchResultTools"), note=document.querySelector("#resultNote");
+  const nr=document.querySelector("#nextRound"), tools=document.querySelector("#matchResultTools"), note=document.querySelector("#resultNote"),panel=document.querySelector("#roundResultPanel");
   const bothFinished=!!s.myRoundResult&&!!s.remoteRoundResult;
   const finalRound=s.match?.round>=(s.match?.rounds||1);
-  if(nr){const allowed=bothFinished&&!finalRound;nr.hidden=!allowed;nr.disabled=!allowed;nr.textContent=s.nextRoundReady?"WAITING FOR OPPONENT":"NEXT ROUND";}
+  const bothReady=!!s.nextRoundReady&&!!s.remoteNextRoundReady;
+  if(nr){
+    const show=bothFinished;
+    nr.hidden=!show;
+    nr.disabled=!show;
+    if(!bothReady)nr.textContent="FINISH";
+    else nr.textContent=finalRound?"FINISHED":"NEXT ROUND";
+  }
+  if(panel){panel.hidden=!bothReady; if(bothReady&&s.roundResult){
+    const p1n=s.match?.names?.host||"PLAYER 1",p2n=s.match?.names?.guest||"PLAYER 2";
+    document.querySelector("#resultP1Name").textContent=p1n;document.querySelector("#resultP2Name").textContent=p2n;
+    document.querySelector("#resultP1Time").textContent=s.roundResult.p1||"DNF";document.querySelector("#resultP2Time").textContent=s.roundResult.p2||"DNF";
+    const a=resultValue(s.roundResult.p1),b=resultValue(s.roundResult.p2);document.querySelector("#resultDifference").textContent=(!Number.isFinite(a)||!Number.isFinite(b))?"—":`${fmt(Math.abs(a-b)*1000)} DIFFERENCE`;
+  }}
   if(tools)tools.hidden=s.matchPhase!=="finished";
   if(note)note.textContent=s.matchPhase==="finished"?`YOUR RESULT: ${s.myRoundResult||"—"}${s.matchPenalty?` / ${s.matchPenalty}`:""}`:"";
   const q=document.querySelector("#mediaQuality");if(q)q.textContent=`CONNECTION: ${s.mediaQuality||"FAIR"}`;
@@ -494,21 +517,24 @@ function maybeResolveRound(force=false){
   updateMatchUI();
 }
 function nextRound(){
-  if(!s.roundResult||s.match.round>=(s.match.rounds||1)||!s.myRoundResult||!s.remoteRoundResult)return;
+  if(!s.myRoundResult||!s.remoteRoundResult)return;
   if(s.nextRoundReady)return;
   s.nextRoundReady=true; updateMatchUI();
   try{s.room.send({type:"next-round-ready",round:s.match.round})}catch{}
   if(s.remoteNextRoundReady)advanceRound();
 }
 function advanceRound(){
-  if(!s.nextRoundReady||!s.remoteNextRoundReady||s.match.round>=(s.match.rounds||1))return;
+  if(!s.nextRoundReady||!s.remoteNextRoundReady)return;
+  if(s.match.round>=(s.match.rounds||1))return;
   if(s.role==="host"){
-    s.match.round++; s.match.status="PLAYING"; s.scramble=randomScramble(); s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.opponent={time:"0.00",status:"WAITING"};s.nextRoundReady=false;s.remoteNextRoundReady=false;s._roundResolved=null;
+    s.match.round++;s.match.status="PLAYING";s.scramble=randomScramble();s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.opponent={time:"0.00",status:"WAITING"};s.nextRoundReady=false;s.remoteNextRoundReady=false;s.advanceRequested=false;s._roundResolved=null;
     try{s.room.send({type:"next-round",round:s.match.round,score:s.match.score,scramble:s.scramble})}catch{} resetMatchRound();
+  }else{
+    try{s.room.send({type:"next-round-request",round:s.match.round})}catch{}
   }
 }
 
-function resetMatchRound(){s.matchPhase="ready";s.matchPenalty="";cancelAnimationFrame(s.matchRaf);cancelAnimationFrame(s.opponentRaf);s.opponent={time:"0.00",status:"WAITING"};s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.matchRawMs=0;s.matchPenalty="";s.nextRoundReady=false;s.remoteNextRoundReady=false;s._roundResolved=null;renderMatch(false)}
+function resetMatchRound(){s.matchPhase="ready";s.matchPenalty="";cancelAnimationFrame(s.matchRaf);cancelAnimationFrame(s.opponentRaf);s.opponent={time:"0.00",status:"WAITING"};s.myRoundResult="";s.remoteRoundResult="";s.roundResult=null;s.matchRawMs=0;s.matchPenalty="";s.nextRoundReady=false;s.remoteNextRoundReady=false;s.advanceRequested=false;s._roundResolved=null;renderMatch(false)}
 function settingsView(){v(`<div class="section-title"><h1>SETTINGS</h1><small>LOCAL DEVICE</small></div><div class="settings-grid"><div class="setting-card"><h2>APPEARANCE</h2><div class="theme-options" style="margin-top:14px"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div></div><div class="setting-card"><h2>PROFILE</h2><div class="field"><label>DISPLAY NAME</label><input id="displayName" maxlength="24" value="${esc(settings.name||"")}" placeholder="YOUR NAME" autocomplete="nickname"></div><p style="color:#666;font-size:12px;line-height:1.6">Your name is shown to the other player during 1v1 matches.</p></div><div class="setting-card creator-card"><h2>CREATOR</h2><div class="creator-name">SID ANAJAO</div><p>Created and developed by Sid Anajao.</p></div><div class="setting-card"><h2>TIMER</h2><div class="field"><label>INSPECTION SECONDS</label><select id="ins"><option ${settings.inspection===0?"selected":""}>0</option><option ${settings.inspection===10?"selected":""}>10</option><option ${settings.inspection===15?"selected":""}>15</option></select></div><div class="room-actions"><button class="primary-btn" id="save">SAVE SETTINGS</button></div></div><div class="setting-card"><h2>DATA</h2><p style="color:#666;font-size:12px;line-height:1.6">Solves are stored locally in IndexedDB. Export your times before clearing browser data or moving to another device.</p><div class="room-actions"><button class="ghost-btn" id="ex">EXPORT JSON</button><label class="ghost-btn" style="display:grid;place-items:center;cursor:pointer">IMPORT JSON<input id="im" type="file" accept=".json" hidden></label><button class="danger-btn" id="cl">CLEAR SOLVES</button></div></div><div class="setting-card wipe-card"><h2>RESET / UPDATE</h2><p style="color:#666;font-size:12px;line-height:1.6">Use this when a new CubeClash update is installed and the old service worker or cached files are causing problems. CubeClash will automatically download a JSON backup of your solve history first, then clear local app data, caches, and the service worker.</p><div class="room-actions"><button class="danger-btn" id="wipeAll">EXPORT + WIPE APP DATA</button></div></div></div>`);bindTheme();applyTheme(localStorage.getItem("cubeclash-theme")||"dark");document.querySelector("#save").onclick=()=>{settings.inspection=+document.querySelector("#ins").value;settings.name=(document.querySelector("#displayName")?.value||"").trim().slice(0,24);const selected=document.querySelector(".theme-option.active")?.dataset.theme||currentTheme();applyTheme(selected);localStorage.setItem("cubeclash-settings",JSON.stringify(settings));toast("SETTINGS SAVED")};document.querySelector("#ex").onclick=async()=>{const b=new Blob([JSON.stringify(await exportData(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`cubeclash-${Date.now()}.json`;a.click()};document.querySelector("#im").onchange=async e=>{try{await importData(JSON.parse(await e.target.files[0].text()));toast("DATA IMPORTED")}catch{toast("IMPORT FAILED")}};document.querySelector("#cl").onclick=async()=>{if(confirm("Clear all local solves? This cannot be undone unless you exported them.")){await clearSolves();toast("SOLVES CLEARED")}};document.querySelector("#wipeAll").onclick=async()=>{if(!confirm("CubeClash will export your solve history and then clear local app data, cache, settings, and service worker. Continue?"))return;try{await wipeCubeClashData({downloadBackup:true});alert("Backup downloaded. CubeClash will reload with a clean installation.");location.reload()}catch(e){console.error(e);toast("RESET FAILED")}}}
 async function nav(x){if(x==="home")home();if(x==="solo")await solo();if(x==="room")room();if(x==="settings")settingsView()}document.addEventListener("click",e=>{const x=e.target.closest("[data-view]");if(x)nav(x.dataset.view)});window.addEventListener("online",()=>{document.querySelector("#networkText").textContent="ONLINE"});window.addEventListener("offline",()=>{document.querySelector("#networkText").textContent="OFFLINE"});window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;document.querySelector("#installBtn").hidden=false});document.querySelector("#installBtn").onclick=async()=>{if(deferredInstall){await deferredInstall.prompt();deferredInstall=null}};if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("./service-worker.js");
 if(localStorage.getItem("cubeclash-tutorial-seen")==="1")home();else tutorial();
