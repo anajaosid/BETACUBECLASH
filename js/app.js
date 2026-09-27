@@ -63,7 +63,7 @@ async function randomScramble(){
 }
 
 async function scr(){s.scramble=await randomScramble();return s.scramble}
-function cube(){return `<div class="cube3d-wrap"><div class="cube3d" id="cube3d" data-puzzle="${s.puzzle}" data-scramble="${esc(s.scramble)}"></div></div>`}
+function cube(){const moves=s.scramble.trim().split(/\s+/).filter(Boolean);return `<div class="cube3d-wrap cube-player-wrap"><div class="cube-follow-head"><span>FOLLOW THE SCRAMBLE</span><span>WHITE TOP · GREEN FRONT</span></div><div class="cube3d" id="cube3d" data-puzzle="${s.puzzle}" data-scramble="${esc(s.scramble)}"></div><div class="cube-follow-foot"><span>${moves.length} MOVES · WATCH EACH TURN</span><button class="ghost-btn" id="replayScramble">REPLAY SCRAMBLE</button></div></div>`}
 
 function rotateVector(v,axis,quarterTurns){
   let [x,y,z]=v;
@@ -210,7 +210,35 @@ function renderCube(){
   const audit=auditCubeEngine(size,s.scramble);root.dataset.engineAudit=audit?"pass":"fail";
   if(size===2)render222Cube(root);else render333Cube(root);
 }
-async function mountCube(){try{renderCube()}catch(err){console.error("CubeClash cube renderer error:",err);const h=document.querySelector("#cube3d");if(h)h.innerHTML=`<div class="cube-error"><strong>3D CUBE ERROR</strong><span>${esc(err.message||String(err))}</span></div>`}}
+async function mountCube(){
+  const h=document.querySelector("#cube3d");
+  if(!h)return;
+  try{
+    const mod=await import("https://cdn.cubing.net/v0/js/cubing/twisty");
+    await customElements.whenDefined("twisty-player");
+    const player=new mod.TwistyPlayer({
+      puzzle:s.puzzle==="222"?"2x2x2":"3x3x3",
+      alg:s.scramble,
+      hintFacelets:"none",
+      background:"none",
+      controlPanel:"none",
+      experimentalDragInput:"auto",
+      tempoScale:0.7
+    });
+    player.style.cssText="width:100%;height:100%;display:block;background:transparent;";
+    h.replaceChildren(player);
+    s.twistyPlayer=player;
+    requestAnimationFrame(()=>{
+      try{player.jumpToStart({flash:false});player.play()}catch(e){console.warn("CubeClash scramble animation could not start",e)}
+    });
+  }catch(err){
+    console.error("CubeClash animated cube renderer error:",err);
+    try{renderCube()}catch(fallbackErr){
+      console.error("CubeClash fallback renderer error:",fallbackErr);
+      h.innerHTML=`<div class="cube-error"><strong>3D CUBE ERROR</strong><span>${esc(fallbackErr.message||String(fallbackErr))}</span></div>`;
+    }
+  }
+}
 function adjustedSolveMs(x){
   if(!x||x.penalty==="DNF"||x.display==="DNF")return Infinity;
   const base=Number(x.timeMs)||0;
@@ -251,8 +279,13 @@ async function solo(){
 }
 function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);document.querySelector("#tl").textContent=label}function stop(){cancelAnimationFrame(s.raf)}function loop(){const n=performance.now();if(s.phase==="inspection")set(Math.max(0,settings.inspection*1000-(n-s.inspectionStart)),"INSPECTION");if(s.phase==="solving")set(n-s.solveStart,"SOLVING");s.raf=requestAnimationFrame(loop)}function press(){if(s.phase==="ready"||s.phase==="stopped"){s.phase="inspection";s.inspectionStart=performance.now();loop();return}if(s.phase==="inspection"){const e=performance.now()-s.inspectionStart;s.penalty=e>=17000?"DNF":e>=15000?"+2":"";s.phase="solving";s.solveStart=performance.now();return}if(s.phase==="solving")finish()}async function finish(){const ms=performance.now()-s.solveStart;stop();s.phase="stopped";const display=s.penalty==="DNF"?"DNF":fmt(ms+(s.penalty==="+2"?2000:0));s.last={display};await addSolve({id:crypto.randomUUID(),createdAt:Date.now(),puzzle:s.puzzle,scramble:s.scramble,timeMs:ms,penalty:s.penalty,display});toast(display);setTimeout(async()=>{s.phase="ready";await scr();solo()},300)}function bindSolo(){
   mountCube();
-  document.querySelector("#new").onclick=async()=>{stop();s.phase="ready";await scr();solo()};
-  document.querySelector("#p").onchange=async e=>{s.puzzle=e.target.value;stop();s.phase="ready";await scr();solo()};
+  document.querySelector("#new").onclick=async()=>{stop();s.twistyPlayer=null;s.phase="ready";await scr();solo()};
+  document.querySelector("#p").onchange=async e=>{s.puzzle=e.target.value;stop();s.twistyPlayer=null;s.phase="ready";await scr();solo()};
+  document.querySelector("#replayScramble")?.addEventListener("click",()=>{
+    const player=s.twistyPlayer;
+    if(!player)return;
+    try{player.jumpToStart({flash:false});player.play()}catch(e){console.warn("Replay failed",e)}
+  });
   document.querySelector("#copy").onclick=()=>navigator.clipboard?.writeText(s.scramble).then(()=>toast("SCRAMBLE COPIED"));
   document.querySelector("#zone").onpointerdown=()=>press();
   if(window._cubeClashSoloKeyHandler)document.removeEventListener("keydown",window._cubeClashSoloKeyHandler,true);
