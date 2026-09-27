@@ -194,15 +194,30 @@ function renderCube(root=document.querySelector("#cube3d"),state=buildCubeState(
 }
 
 function cubeMoveDuration(){const base=s.puzzle==="222"?260:220;const speed=Math.max(.25,Math.min(2,Number(settings.scrambleSpeed)||1));return Math.round(base/speed)}
-function cubeMoveAngle(token){
+function cubeMoveAngle(token, quarterSignOverride=null){
   const face=token[0];
   const sign=MOVE_SIGN[face]*(token.includes("'")?-1:1);
-  const turns=token.endsWith("2")?2:1;
-  return {axis:MOVE_AXIS[face],angle:sign*90*turns};
+  const quarter=quarterSignOverride==null?sign:quarterSignOverride;
+  return {axis:MOVE_AXIS[face],angle:quarter*90};
 }
 function cubePosition(c,size){
   const cubie=size===2?82:54,gap=size===2?4:3,pitch=cubie+gap;
   return [c.p[0]*(size===2?pitch/2:pitch),-c.p[1]*(size===2?pitch/2:pitch),c.p[2]*(size===2?pitch/2:pitch)];
+}
+function tokenQuarterMoves(token){
+  const face=token[0];
+  const direction=token.includes("'")?-1:1;
+  const count=token.endsWith("2")?2:1;
+  return Array.from({length:count},()=>({face,direction}));
+}
+function quarterToken(face,direction){
+  if(direction===1)return face;
+  return `${face}'`;
+}
+function applyQuarterToTokens(tokens,index,face,direction,quarterIndex){
+  const before=tokens.slice(0,index).join(" ");
+  const extra=Array.from({length:quarterIndex},()=>quarterToken(face,direction)).join(" ");
+  return [before,extra].filter(Boolean).join(" ");
 }
 function animateOwnScramble(){
   const root=document.querySelector("#cube3d");
@@ -219,26 +234,36 @@ function animateOwnScramble(){
     let currentModel=root.querySelector(size===2?".cube-model-222":".cube-model-333");
     if(moveLabel)moveLabel.textContent="START / SOLVED";
     if(replay)replay.disabled=true;
+    let completed=0;
     for(let i=0;i<tokens.length;i++){
       if(runId!==s.scrambleRunId)return;
       const token=tokens[i];
-      if(moveLabel)moveLabel.textContent=`MOVE ${i+1} / ${tokens.length} · ${token}`;
-      const before=buildCubeState(size,tokens.slice(0,i).join(" "));
-      const face=token[0],axis=MOVE_AXIS[face],layer=MOVE_LAYER[face],idx=axis==="x"?0:axis==="y"?1:2;
-      const angle=cubeMoveAngle(token);
-      [...currentModel.children].forEach((piece,index)=>{
-        const cubie=before[index];
-        if(!cubie||cubie.p[idx]!==layer)return;
-        const after=buildCubeState(size,tokens.slice(0,i+1).join(" "))[index];
-        const [nx,ny,nz]=cubePosition(after,size);
-        piece.style.transition=`transform ${cubeMoveDuration()}ms cubic-bezier(.2,.7,.2,1)`;
-        piece.style.transform=`translate3d(${nx}px,${ny}px,${nz}px) rotate${axis.toUpperCase()}(${angle.angle}deg)`;
-      });
-      await new Promise(r=>setTimeout(r,cubeMoveDuration()+35));
-      if(runId!==s.scrambleRunId)return;
-      renderCube(root,buildCubeState(size,tokens.slice(0,i+1).join(" ")));
-      currentModel=root.querySelector(size===2?".cube-model-222":".cube-model-333");
-      await new Promise(r=>setTimeout(r,45));
+      const quarters=tokenQuarterMoves(token);
+      for(let q=0;q<quarters.length;q++){
+        if(runId!==s.scrambleRunId)return;
+        const {face,direction}=quarters[q];
+        const stateTokens=applyQuarterToTokens(tokens,i,face,direction,q);
+        const before=buildCubeState(size,stateTokens);
+        const afterTokens=applyQuarterToTokens(tokens,i,face,direction,q+1);
+        const after=buildCubeState(size,afterTokens);
+        const axis=MOVE_AXIS[face],layer=MOVE_LAYER[face],idx=axis==="x"?0:axis==="y"?1:2;
+        const angle=cubeMoveAngle(token,direction);
+        if(moveLabel)moveLabel.textContent=`MOVE ${i+1} / ${tokens.length} · ${token}${quarters.length===2?` · TURN ${q+1}/2`:""}`;
+        [...currentModel.children].forEach((piece,index)=>{
+          const cubie=before[index];
+          if(!cubie||cubie.p[idx]!==layer)return;
+          const cAfter=after[index];
+          const [nx,ny,nz]=cubePosition(cAfter,size);
+          piece.style.transition=`transform ${cubeMoveDuration()}ms cubic-bezier(.2,.7,.2,1)`;
+          piece.style.transform=`translate3d(${nx}px,${ny}px,${nz}px) rotate${axis.toUpperCase()}(${angle.angle}deg)`;
+        });
+        await new Promise(r=>setTimeout(r,cubeMoveDuration()+35));
+        if(runId!==s.scrambleRunId)return;
+        renderCube(root,after);
+        currentModel=root.querySelector(size===2?".cube-model-222":".cube-model-333");
+        completed++;
+        await new Promise(r=>setTimeout(r,45));
+      }
     }
     if(runId===s.scrambleRunId){
       if(moveLabel)moveLabel.textContent="SCRAMBLE READY · FOLLOW THE MOVES ABOVE";
