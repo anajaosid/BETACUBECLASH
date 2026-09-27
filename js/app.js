@@ -10,7 +10,7 @@ const toast=x=>{toastEl.textContent=x;toastEl.classList.add("show");clearTimeout
 const CUBE_COLORS={R:"R",L:"O",U:"W",D:"Y",F:"G",B:"B"};
 const MOVE_AXIS={R:"x",L:"x",U:"y",D:"y",F:"z",B:"z"};
 const MOVE_LAYER={R:1,L:-1,U:1,D:-1,F:1,B:-1};
-const MOVE_SIGN={R:-1,L:1,U:1,D:-1,F:1,B:-1};
+const MOVE_SIGN={R:-1,L:1,U:-1,D:1,F:-1,B:1};
 const COLOR_HEX={R:"#d71920",O:"#ff6a00",W:"#f7f7f7",Y:"#ffd500",G:"#009b48",B:"#0051ba"};
 
 function randomInt(max){return Math.floor(Math.random()*max)}
