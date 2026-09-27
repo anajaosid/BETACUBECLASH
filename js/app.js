@@ -277,6 +277,7 @@ function wireRoom(){
         if(s.match.round>=(s.match.rounds||1)&&s.nextRoundReady){
           s.match.status="FINISHED";
           try{s.room.send({type:"match-over",winner:s.roundResult?.winner||"DRAW",history:s.matchHistory})}catch{}
+          requestAnimationFrame(()=>document.querySelector("#roundResultPanel")?.scrollIntoView({behavior:"smooth",block:"center"}));
         }
         updateMatchUI();
       }
@@ -291,7 +292,10 @@ function wireRoom(){
       if(Array.isArray(msg.history)){s.matchHistory=msg.history.slice().sort((a,b)=>a.round-b.round);updateMatchUI();}
     }
     if(msg.type==="match-over"){
-      s.match.status="FINISHED"; s.match.winner=msg.winner||"DRAW"; updateMatchUI();
+      s.match.status="FINISHED"; s.match.winner=msg.winner||"DRAW";
+      if(Array.isArray(msg.history))s.matchHistory=msg.history.slice().sort((a,b)=>a.round-b.round);
+      updateMatchUI();
+      requestAnimationFrame(()=>document.querySelector("#roundResultPanel")?.scrollIntoView({behavior:"smooth",block:"center"}));
     }
   }).on("stream",stream=>{
     s.remoteStream=stream; const v=document.querySelector("#remoteVideo"); if(v){v.srcObject=stream; v.autoplay=true; v.playsInline=true; v.play().catch(()=>{document.querySelector("#remoteVideo")?.setAttribute("controls","true")})} const note=document.querySelector("#remoteCamState"); if(note)note.textContent="OPPONENT CAMERA + MIC CONNECTED";
@@ -406,15 +410,26 @@ function bindMatchTimer(){
   window._cubeClashMatchKeyHandler=keyHandler;
 }
 
-function exitMatch(){
+function cleanupMatchMedia(){
   try{
     if(s.mediaStatsRaf)clearTimeout(s.mediaStatsRaf);
+    s.mediaStatsRaf=0;
+    cancelAnimationFrame(s.matchRaf);
+    cancelAnimationFrame(s.opponentRaf);
     cancelAnimationFrame(s.raf);
+    const local=document.querySelector("#localVideo");
+    const remote=document.querySelector("#remoteVideo");
+    if(local){local.pause?.();local.srcObject=null;}
+    if(remote){remote.pause?.();remote.srcObject=null;}
     if(s.localStream)for(const track of s.localStream.getTracks())track.stop();
     if(s.remoteStream)for(const track of s.remoteStream.getTracks())track.stop();
     s.room?.close();
-  }catch(e){console.warn("Match cleanup failed",e)}
-  s.localStream=null;s.remoteStream=null;s.room=null;s.role=null;s.pendingCamera=false;
+  }catch(e){console.warn("Match media cleanup failed",e)}
+  s.localStream=null;s.remoteStream=null;s.remoteMediaReady=false;s.pendingCamera=false;
+}
+function exitMatch(){
+  cleanupMatchMedia();
+  s.room=null;s.role=null;s.roomCode="";
   window.location.reload();
 }
 
@@ -456,6 +471,7 @@ function updateMatchUI(){
   const finalRound=s.match?.round>=(s.match?.rounds||1);
   const bothReady=!!s.nextRoundReady&&!!s.remoteNextRoundReady;
   const history=(s.matchHistory||[]).filter(item=>!(item.final&&finalRound&&!bothReady));
+  const matchFinished=s.match?.status==="FINISHED";
   if(nr){
     nr.hidden=!bothFinished;
     const waiting=s.nextRoundReady&&!s.remoteNextRoundReady;
@@ -466,6 +482,7 @@ function updateMatchUI(){
   }
   if(panel){
     panel.hidden=history.length===0;
+    panel.classList.toggle("match-final-results",matchFinished);
     if(history.length&&historyList){
       if(title)title.textContent=s.match?.status==="FINISHED"?"MATCH RESULTS":"ROUND RESULTS";
       const p1n=s.match?.names?.host||"PLAYER 1",p2n=s.match?.names?.guest||"PLAYER 2";
@@ -577,5 +594,12 @@ function resetMatchRound(){
 }
 
 function settingsView(){v(`<div class="section-title"><h1>SETTINGS</h1><small>LOCAL DEVICE</small></div><div class="settings-grid"><div class="setting-card"><h2>APPEARANCE</h2><div class="theme-options" style="margin-top:14px"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div></div><div class="setting-card"><h2>PROFILE</h2><div class="field"><label>DISPLAY NAME</label><input id="displayName" maxlength="24" value="${esc(settings.name||"")}" placeholder="YOUR NAME" autocomplete="nickname"></div><p style="color:#666;font-size:12px;line-height:1.6">Your name is shown to the other player during 1v1 matches.</p></div><div class="setting-card creator-card"><h2>CREATOR</h2><div class="creator-name">SID ANAJAO</div><p>Created and developed by Sid Anajao.</p></div><div class="setting-card"><h2>TIMER</h2><div class="field"><label>INSPECTION SECONDS</label><select id="ins"><option ${settings.inspection===0?"selected":""}>0</option><option ${settings.inspection===10?"selected":""}>10</option><option ${settings.inspection===15?"selected":""}>15</option></select></div><div class="room-actions"><button class="primary-btn" id="save">SAVE SETTINGS</button></div></div><div class="setting-card"><h2>DATA</h2><p style="color:#666;font-size:12px;line-height:1.6">Solves are stored locally in IndexedDB. Export your times before clearing browser data or moving to another device.</p><div class="room-actions"><button class="ghost-btn" id="ex">EXPORT JSON</button><label class="ghost-btn" style="display:grid;place-items:center;cursor:pointer">IMPORT JSON<input id="im" type="file" accept=".json" hidden></label><button class="danger-btn" id="cl">CLEAR SOLVES</button></div></div><div class="setting-card wipe-card"><h2>RESET / UPDATE</h2><p style="color:#666;font-size:12px;line-height:1.6">Use this when a new CubeClash update is installed and the old service worker or cached files are causing problems. CubeClash will automatically download a JSON backup of your solve history first, then clear local app data, caches, and the service worker.</p><div class="room-actions"><button class="danger-btn" id="wipeAll">EXPORT + WIPE APP DATA</button></div></div></div>`);bindTheme();applyTheme(localStorage.getItem("cubeclash-theme")||"dark");document.querySelector("#save").onclick=()=>{settings.inspection=+document.querySelector("#ins").value;settings.name=(document.querySelector("#displayName")?.value||"").trim().slice(0,24);const selected=document.querySelector(".theme-option.active")?.dataset.theme||currentTheme();applyTheme(selected);localStorage.setItem("cubeclash-settings",JSON.stringify(settings));toast("SETTINGS SAVED")};document.querySelector("#ex").onclick=async()=>{const b=new Blob([JSON.stringify(await exportData(),null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(b);a.download=`cubeclash-${Date.now()}.json`;a.click()};document.querySelector("#im").onchange=async e=>{try{await importData(JSON.parse(await e.target.files[0].text()));toast("DATA IMPORTED")}catch{toast("IMPORT FAILED")}};document.querySelector("#cl").onclick=async()=>{if(confirm("Clear all local solves? This cannot be undone unless you exported them.")){await clearSolves();toast("SOLVES CLEARED")}};document.querySelector("#wipeAll").onclick=async()=>{if(!confirm("CubeClash will export your solve history and then clear local app data, cache, settings, and service worker. Continue?"))return;try{await wipeCubeClashData({downloadBackup:true});alert("Backup downloaded. CubeClash will reload with a clean installation.");location.reload()}catch(e){console.error(e);toast("RESET FAILED")}}}
-async function nav(x){if(x==="home")home();if(x==="solo")await solo();if(x==="room")room();if(x==="settings")settingsView()}document.addEventListener("click",e=>{const x=e.target.closest("[data-view]");if(x)nav(x.dataset.view)});window.addEventListener("online",()=>{document.querySelector("#networkText").textContent="ONLINE"});window.addEventListener("offline",()=>{document.querySelector("#networkText").textContent="OFFLINE"});window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;document.querySelector("#installBtn").hidden=false});document.querySelector("#installBtn").onclick=async()=>{if(deferredInstall){await deferredInstall.prompt();deferredInstall=null}};if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("./service-worker.js");
+async function nav(x){
+  if(s.room||s.localStream||s.remoteStream)cleanupMatchMedia();
+  s.room=null;s.role=null;s.roomCode="";
+  if(x==="home")home();
+  if(x==="solo")await solo();
+  if(x==="room")room();
+  if(x==="settings")settingsView();
+}document.addEventListener("click",e=>{const x=e.target.closest("[data-view]");if(x)nav(x.dataset.view)});window.addEventListener("online",()=>{document.querySelector("#networkText").textContent="ONLINE"});window.addEventListener("offline",()=>{document.querySelector("#networkText").textContent="OFFLINE"});window.addEventListener("beforeinstallprompt",e=>{e.preventDefault();deferredInstall=e;document.querySelector("#installBtn").hidden=false});document.querySelector("#installBtn").onclick=async()=>{if(deferredInstall){await deferredInstall.prompt();deferredInstall=null}};if("serviceWorker" in navigator&&location.protocol!=="file:")navigator.serviceWorker.register("./service-worker.js");
 if(localStorage.getItem("cubeclash-tutorial-seen")==="1")home();else tutorial();
