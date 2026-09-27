@@ -135,7 +135,7 @@ function render222Cube(root){
   root.appendChild(model);
   for(const c of state){
     const stickers=new Map(c.stickers.map(st=>[st.normal.join(","),st.color]));
-    const piece=makeCubePiece(c,size,half,stickers,`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;transform-style:preserve-3d;transform:translate3d(${c.p[0]*pitch}px,${-c.p[1]*pitch}px,${c.p[2]*pitch}px);background:#111;border:2px solid #030303;border-radius:9px;box-shadow:inset 0 0 0 1px #383838,inset 0 -7px 12px #000b,0 5px 10px #0009;`);
+    const piece=makeCubePiece(c,size,half,stickers,`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;transform-style:preserve-3d;transform:translate3d(${c.p[0]*(pitch/2)}px,${-c.p[1]*(pitch/2)}px,${c.p[2]*(pitch/2)}px);background:#111;border:2px solid #030303;border-radius:9px;box-shadow:inset 0 0 0 1px #383838,inset 0 -7px 12px #000b,0 5px 10px #0009;`);
     model.appendChild(piece);
   }
   bindCubeDrag(root,model,-24,-35);
@@ -438,11 +438,13 @@ function updateMatchUI(){
   if(nr){
     const show=bothFinished;
     nr.hidden=!show;
-    nr.disabled=!show;
-    if(!bothReady)nr.textContent="FINISH";
-    else nr.textContent=finalRound?"FINISHED":"NEXT ROUND";
+    const waiting=s.nextRoundReady&&!s.remoteNextRoundReady;
+    nr.disabled=!show||waiting||(finalRound&&bothReady);
+    if(waiting)nr.textContent="WAITING FOR OPPONENT";
+    else if(finalRound)nr.textContent=bothReady?"MATCH FINISHED":"FINISH ROUND";
+    else nr.textContent="NEXT ROUND";
   }
-  if(panel){panel.hidden=!bothReady; if(bothReady&&s.roundResult){
+  if(panel){panel.hidden=!bothFinished; if(bothFinished&&s.roundResult){
     const p1n=s.match?.names?.host||"PLAYER 1",p2n=s.match?.names?.guest||"PLAYER 2";
     document.querySelector("#resultP1Name").textContent=p1n;document.querySelector("#resultP2Name").textContent=p2n;
     document.querySelector("#resultP1Time").textContent=s.roundResult.p1||"DNF";document.querySelector("#resultP2Time").textContent=s.roundResult.p2||"DNF";
@@ -519,9 +521,13 @@ function maybeResolveRound(force=false){
 function nextRound(){
   if(!s.myRoundResult||!s.remoteRoundResult)return;
   if(s.nextRoundReady)return;
-  s.nextRoundReady=true; updateMatchUI();
+  s.nextRoundReady=true;
+  updateMatchUI();
   try{s.room.send({type:"next-round-ready",round:s.match.round})}catch{}
-  if(s.remoteNextRoundReady)advanceRound();
+  if(s.remoteNextRoundReady){
+    if(s.match.round<(s.match.rounds||1)) advanceRound();
+    else { s.match.status="FINISHED"; updateMatchUI(); }
+  }
 }
 function advanceRound(){
   if(!s.nextRoundReady||!s.remoteNextRoundReady)return;
