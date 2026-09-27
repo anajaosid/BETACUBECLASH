@@ -356,8 +356,16 @@ function render2DScramble(){
   const root=document.querySelector("#scramble2DVisual"); if(!root)return;
   const size=s.puzzle==="222"?2:3, state=buildCubeState(size,s.scramble), by={U:[],D:[],F:[],B:[],R:[],L:[]};
   const normals={U:[0,1,0],D:[0,-1,0],F:[0,0,1],B:[0,0,-1],R:[1,0,0],L:[-1,0,0]};
-  for(const c of state)for(const [normal,color] of c.stickers){
-    for(const [face,n] of Object.entries(normals))if(normal[0]===n[0]&&normal[1]===n[1]&&normal[2]===n[2])by[face].push([c.p,normal,color]);
+  for(const c of state){
+    for(const sticker of c.stickers){
+      const normal=sticker.normal, color=sticker.color;
+      for(const [face,n] of Object.entries(normals)){
+        if(normal[0]===n[0]&&normal[1]===n[1]&&normal[2]===n[2]){
+          by[face].push([c.p,normal,color]);
+          break;
+        }
+      }
+    }
   }
   const faces=["U","L","F","R","B","D"];
   root.innerHTML=faces.map(face=>`<div class="net-face net-${face}" style="--n:${size}"><span class="net-label">${face}</span>${faceletGrid(size,by[face],face)}</div>`).join("");
