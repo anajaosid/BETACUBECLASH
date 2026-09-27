@@ -36,3 +36,9 @@ For normal camera, microphone, PWA, and WebRTC features, use an HTTPS site such 
 ## Creator
 
 Created and developed by **Sid Anajao**.
+
+
+## v41 changes
+- Prevented Space/Enter from scrolling the solo page, including repeated keydown events while holding Space.
+- Added DELETE button beside each recent solo solve.
+- Deleting a solve removes it from IndexedDB and refreshes solo statistics/history.

@@ -1,4 +1,4 @@
-import {addSolve,getSolves,clearSolves,exportData,importData} from "./storage.js";
+import {addSolve,getSolves,deleteSolve,clearSolves,exportData,importData} from "./storage.js";
 import {wipeCubeClashData} from "./reset.js";
 import {P2PRoom} from "./p2p.js";
 const app=document.querySelector("#app"),toastEl=document.querySelector("#toast"); app.dataset.started="1";let deferredInstall=null;let settings={};try{settings=JSON.parse(localStorage.getItem("cubeclash-settings")||"{}")}catch{settings={}}settings.inspection??=15;settings.sound??=true;settings.name??="";let s={puzzle:"333",scramble:"",phase:"ready",matchPhase:"ready",inspectionStart:0,solveStart:0,raf:0,last:null,room:null,role:null,opponent:{time:"0.00",status:"WAITING"},round:1,mediaQuality:"FAIR",mediaStatsRaf:0,nextRoundReady:false,matchHistory:[]};
@@ -213,32 +213,54 @@ function renderCube(){
 async function mountCube(){
   const h=document.querySelector("#cube3d");
   if(!h)return;
+  const size=s.puzzle==="222"?"2x2x2":"3x3x3";
+  let player=null;
   try{
     const mod=await import("https://cdn.cubing.net/v0/js/cubing/twisty");
     await customElements.whenDefined("twisty-player");
-    const player=new mod.TwistyPlayer({
-      puzzle:s.puzzle==="222"?"2x2x2":"3x3x3",
+    player=new mod.TwistyPlayer({
+      puzzle:size,
       alg:s.scramble,
       hintFacelets:"none",
       background:"none",
       controlPanel:"none",
-      experimentalDragInput:"auto",
+      backView:"none",
+      cameraLatitude:25,
+      cameraLongitude:-35,
+      cameraDistance:6,
       tempoScale:0.7
     });
-    player.style.cssText="width:100%;height:100%;display:block;background:transparent;";
+    player.setAttribute("aria-label",`${s.puzzle==="222"?"2 by 2":"3 by 3"} scramble animation`);
+    player.style.cssText="display:block;width:100%;height:100%;min-height:390px;min-width:260px;background:transparent;";
     h.replaceChildren(player);
     s.twistyPlayer=player;
-    requestAnimationFrame(()=>{
-      try{player.jumpToStart({flash:false});player.play()}catch(e){console.warn("CubeClash scramble animation could not start",e)}
-    });
+
+    // Give the custom element a real layout before starting playback.
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+    const box=player.getBoundingClientRect();
+    const shadow=player.shadowRoot;
+    const visual=shadow?.querySelector("canvas,svg");
+    if(box.width<80 || box.height<80 || !visual){
+      throw new Error("Animated cube renderer did not create a visible cube");
+    }
+    try{
+      player.jumpToStart({flash:false});
+      player.play();
+    }catch(e){
+      console.warn("CubeClash scramble animation could not start",e);
+    }
   }catch(err){
-    console.error("CubeClash animated cube renderer error:",err);
-    try{renderCube()}catch(fallbackErr){
+    console.warn("CubeClash animated cube renderer unavailable; using built-in 3D cube",err);
+    s.twistyPlayer=null;
+    try{
+      renderCube();
+    }catch(fallbackErr){
       console.error("CubeClash fallback renderer error:",fallbackErr);
       h.innerHTML=`<div class="cube-error"><strong>3D CUBE ERROR</strong><span>${esc(fallbackErr.message||String(fallbackErr))}</span></div>`;
     }
   }
 }
+
 function adjustedSolveMs(x){
   if(!x||x.penalty==="DNF"||x.display==="DNF")return Infinity;
   const base=Number(x.timeMs)||0;
@@ -274,7 +296,7 @@ async function solo(){
   const a=all.filter(x=>x.puzzle===s.puzzle);
   const valid=a.filter(x=>Number.isFinite(adjustedSolveMs(x)));
   const averages=[5,12,50,100,1000];
-  v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · TOUCH TO START</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div class="stats-panel"><div class="stats-section-head"><div><div class="stats-kicker">CURRENT PUZZLE</div><h2>${s.puzzle==="333"?"3×3":"2×2"} STATISTICS</h2></div><span class="stats-note">LATEST SOLVES FIRST</span></div><div class="stats-grid stats-grid-wide"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${bestSolve(a)}</strong></div>${averages.map(n=>`<div class="stat-box"><small>AO${n}</small><strong>${rollingAverage(a,n)}</strong></div>`).join("")}</div><div class="graph-panel"><div class="graph-head"><div><div class="stats-kicker">TIME TREND</div><h3>LAST 50 SOLVES</h3></div><span class="stats-note">+2 INCLUDED · DNF EXCLUDED</span></div>${buildTimeGraph(a)}</div><div class="solves-list"><div class="solve-list-head"><span>RECENT SOLVES</span><span>${a.length} TOTAL</span></div>${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div></div>`);
+  v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · TOUCH TO START</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div class="stats-panel"><div class="stats-section-head"><div><div class="stats-kicker">CURRENT PUZZLE</div><h2>${s.puzzle==="333"?"3×3":"2×2"} STATISTICS</h2></div><span class="stats-note">LATEST SOLVES FIRST</span></div><div class="stats-grid stats-grid-wide"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${bestSolve(a)}</strong></div>${averages.map(n=>`<div class="stat-box"><small>AO${n}</small><strong>${rollingAverage(a,n)}</strong></div>`).join("")}</div><div class="graph-panel"><div class="graph-head"><div><div class="stats-kicker">TIME TREND</div><h3>LAST 50 SOLVES</h3></div><span class="stats-note">+2 INCLUDED · DNF EXCLUDED</span></div>${buildTimeGraph(a)}</div><div class="solves-list"><div class="solve-list-head"><span>RECENT SOLVES</span><span>${a.length} TOTAL</span></div>${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span><button class="delete-solve-btn" data-delete-solve="${esc(x.id)}" title="Delete this solve" aria-label="Delete solve">DELETE</button></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div></div>`);
   bindSolo();
 }
 function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);document.querySelector("#tl").textContent=label}function stop(){cancelAnimationFrame(s.raf)}function loop(){const n=performance.now();if(s.phase==="inspection")set(Math.max(0,settings.inspection*1000-(n-s.inspectionStart)),"INSPECTION");if(s.phase==="solving")set(n-s.solveStart,"SOLVING");s.raf=requestAnimationFrame(loop)}function press(){if(s.phase==="ready"||s.phase==="stopped"){s.phase="inspection";s.inspectionStart=performance.now();loop();return}if(s.phase==="inspection"){const e=performance.now()-s.inspectionStart;s.penalty=e>=17000?"DNF":e>=15000?"+2":"";s.phase="solving";s.solveStart=performance.now();return}if(s.phase==="solving")finish()}async function finish(){const ms=performance.now()-s.solveStart;stop();s.phase="stopped";const display=s.penalty==="DNF"?"DNF":fmt(ms+(s.penalty==="+2"?2000:0));s.last={display};await addSolve({id:crypto.randomUUID(),createdAt:Date.now(),puzzle:s.puzzle,scramble:s.scramble,timeMs:ms,penalty:s.penalty,display});toast(display);setTimeout(async()=>{s.phase="ready";await scr();solo()},300)}function bindSolo(){
@@ -287,13 +309,15 @@ function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);documen
     try{player.jumpToStart({flash:false});player.play()}catch(e){console.warn("Replay failed",e)}
   });
   document.querySelector("#copy").onclick=()=>navigator.clipboard?.writeText(s.scramble).then(()=>toast("SCRAMBLE COPIED"));
+  document.querySelectorAll("[data-delete-solve]").forEach(btn=>btn.addEventListener("click",async e=>{e.stopPropagation();const id=btn.dataset.deleteSolve;if(!id)return;if(!confirm("Delete this solve? This cannot be undone unless you exported it."))return;try{await deleteSolve(id);const all=await getSolves();const latest=all.find(x=>x.puzzle===s.puzzle);s.last=latest?{display:latest.display}:null;toast("SOLVE DELETED");await solo()}catch(err){console.error(err);toast("DELETE FAILED")}}));
   document.querySelector("#zone").onpointerdown=()=>press();
   if(window._cubeClashSoloKeyHandler)document.removeEventListener("keydown",window._cubeClashSoloKeyHandler,true);
   if(window._cubeClashSoloKeyUpHandler)document.removeEventListener("keyup",window._cubeClashSoloKeyUpHandler,true);
   let held=false,holdFired=false,timer=0;
   const keyDown=e=>{
-    if((e.code!=="Space"&&e.code!=="Enter")||e.repeat)return;
+    if(e.code!=="Space"&&e.code!=="Enter")return;
     e.preventDefault();
+    if(e.repeat)return;
     if(s.phase==="ready"||s.phase==="stopped"){press();return;}
     if(s.phase==="inspection"){
       held=true;holdFired=false;clearTimeout(timer);
@@ -301,8 +325,10 @@ function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);documen
     }
   };
   const keyUp=e=>{
-    if((e.code!=="Space"&&e.code!=="Enter")||!held)return;
-    e.preventDefault();clearTimeout(timer);held=false;
+    if(e.code!=="Space"&&e.code!=="Enter")return;
+    e.preventDefault();
+    if(!held)return;
+    clearTimeout(timer);held=false;
     if(s.phase==="inspection"){if(holdFired){press()}else toast("HOLD SPACE TO START SOLVE");}
     else if(s.phase==="solving")press();
     holdFired=false;
