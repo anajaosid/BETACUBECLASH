@@ -7,64 +7,147 @@ function applyTheme(theme){document.body.classList.toggle("theme-light",theme===
 function bindTheme(){document.querySelectorAll(".theme-option").forEach(b=>b.onclick=()=>applyTheme(b.dataset.theme));}
 function themePanel(){return `<div class="theme-panel"><div class="theme-head"><strong>SELECT THEME</strong><span>APPEARANCE</span></div><div class="theme-options"><button class="theme-option" data-theme="dark"><div class="theme-preview dark"></div><strong>DARK</strong><small>OBSIDIAN / HIGH CONTRAST</small></button><button class="theme-option" data-theme="light"><div class="theme-preview light"></div><strong>WHITE</strong><small>CLEAN / LIGHT GRID</small></button></div><div class="menu-note">YOUR THEME IS SAVED ON THIS DEVICE. YOU CAN CHANGE IT LATER IN SETTINGS.</div></div>`}
 const toast=x=>{toastEl.textContent=x;toastEl.classList.add("show");clearTimeout(toast.t);toast.t=setTimeout(()=>toastEl.classList.remove("show"),1800)};const esc=x=>String(x).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));const fmt=ms=>(ms/1000).toFixed(2);function v(x){app.innerHTML=`<section class="view">${x}</section>`}const MOVES={333:["R","L","U","D","F","B"],222:["R","L","U","D","F","B"]};
-function randomScramble(){const faces=MOVES[s.puzzle]||MOVES[333],suffix=["","'","2"];let out=[],lastAxis="";const axis={R:"x",L:"x",U:"y",D:"y",F:"z",B:"z"};while(out.length<(s.puzzle==="222"?9:20)){const f=faces[Math.floor(Math.random()*faces.length)];if(axis[f]===lastAxis)continue;lastAxis=axis[f];out.push(f+suffix[Math.floor(Math.random()*suffix.length)]);}return out.join(" ");}
-async function scr(){s.scramble=randomScramble();return s.scramble}function cube(){return `<div class="cube3d-wrap"><div class="cube3d" id="cube3d" data-puzzle="${s.puzzle}" data-scramble="${esc(s.scramble)}"></div></div>`}
-function rot(v,axis,dir){let [x,y,z]=v;if(axis==="x")return dir>0?[x,-z,y]:[x,z,-y];if(axis==="y")return dir>0?[z,y,-x]:[-z,y,x];return dir>0?[-y,x,z]:[y,-x,z]}
-function buildCubeState(size,scramble){const vals=[-1,1],coords=[];for(let x=0;x<size;x++)for(let y=0;y<size;y++)for(let z=0;z<size;z++)coords.push({p:[x*2/(size-1)-1,y*2/(size-1)-1,z*2/(size-1)-1],stickers:[]});const colors={x1:"R",x0:"O",y1:"W",y0:"Y",z1:"G",z0:"B"};for(const c of coords){const [x,y,z]=c.p;if(x===1)c.stickers.push([[1,0,0],colors.x1]);if(x===-1)c.stickers.push([[-1,0,0],colors.x0]);if(y===1)c.stickers.push([[0,1,0],colors.y1]);if(y===-1)c.stickers.push([[0,-1,0],colors.y0]);if(z===1)c.stickers.push([[0,0,1],colors.z1]);if(z===-1)c.stickers.push([[0,0,-1],colors.z0]);}
-for(const token of scramble.trim().split(/\s+/)){if(!token)continue;const face=token[0],turns=token.endsWith("2")?2:1,dir=token.includes("'")?-1:1;const axis={R:"x",L:"x",U:"y",D:"y",F:"z",B:"z"}[face];const layer={R:1,L:-1,U:1,D:-1,F:1,B:-1}[face];const sign={R:-1,L:1,U:1,D:-1,F:-1,B:1}[face];for(let n=0;n<turns;n++)for(const c of coords){if(c.p[axis==="x"?0:axis==="y"?1:2]!==layer)continue;c.p=rot(c.p,axis,sign*dir);c.stickers=c.stickers.map(([normal,color])=>[rot(normal,axis,sign*dir),color]);}}
-return coords}
-function stickerTransform(n,d=31){const [x,y,z]=n;if(x===1)return `rotateY(90deg) translateZ(${d}px)`;if(x===-1)return `rotateY(-90deg) translateZ(${d}px)`;if(y===1)return `rotateX(90deg) translateZ(${d}px)`;if(y===-1)return `rotateX(-90deg) translateZ(${d}px)`;if(z===1)return `translateZ(${d}px)`;return `rotateY(180deg) translateZ(${d}px)`}
+const CUBE_COLORS={R:"R",L:"O",U:"W",D:"Y",F:"G",B:"B"};
+const MOVE_AXIS={R:"x",L:"x",U:"y",D:"y",F:"z",B:"z"};
+const MOVE_LAYER={R:1,L:-1,U:1,D:-1,F:1,B:-1};
+const MOVE_SIGN={R:-1,L:1,U:1,D:-1,F:-1,B:1};
+const COLOR_HEX={R:"#d71920",O:"#ff6a00",W:"#f7f7f7",Y:"#ffd500",G:"#009b48",B:"#0051ba"};
+
+function randomScramble(){
+  const faces=MOVES[s.puzzle]||MOVES[333],suffix=["","'","2"],axis=MOVE_AXIS;
+  const count=s.puzzle==="222"?9:20;let out=[],lastAxis="";
+  while(out.length<count){
+    const f=faces[Math.floor(Math.random()*faces.length)];
+    if(axis[f]===lastAxis)continue;
+    lastAxis=axis[f];out.push(f+suffix[Math.floor(Math.random()*suffix.length)]);
+  }
+  return out.join(" ");
+}
+
+async function scr(){s.scramble=randomScramble();return s.scramble}
+function cube(){return `<div class="cube3d-wrap"><div class="cube3d" id="cube3d" data-puzzle="${s.puzzle}" data-scramble="${esc(s.scramble)}"></div></div>`}
+
+function rotateVector(v,axis,quarterTurns){
+  let [x,y,z]=v;
+  let n=((quarterTurns%4)+4)%4;
+  while(n--){
+    if(axis==="x")[y,z]=[-z,y];
+    else if(axis==="y")[x,z]=[z,-x];
+    else [x,y]=[y,-x];
+  }
+  return [x,y,z];
+}
+
+function buildSolvedCubeState(size){
+  const state=[];
+  for(let x=0;x<size;x++)for(let y=0;y<size;y++)for(let z=0;z<size;z++){
+    const p=[x*2/(size-1)-1,y*2/(size-1)-1,z*2/(size-1)-1];
+    const stickers=[];
+    if(x===size-1)stickers.push({normal:[1,0,0],color:CUBE_COLORS.R});
+    if(x===0)stickers.push({normal:[-1,0,0],color:CUBE_COLORS.L});
+    if(y===size-1)stickers.push({normal:[0,1,0],color:CUBE_COLORS.U});
+    if(y===0)stickers.push({normal:[0,-1,0],color:CUBE_COLORS.D});
+    if(z===size-1)stickers.push({normal:[0,0,1],color:CUBE_COLORS.F});
+    if(z===0)stickers.push({normal:[0,0,-1],color:CUBE_COLORS.B});
+    state.push({p,stickers});
+  }
+  return state;
+}
+
+function applyMove(state,token){
+  const face=token[0];
+  const axis=MOVE_AXIS[face];
+  const layer=MOVE_LAYER[face];
+  const base=MOVE_SIGN[face]*(token.includes("'")?-1:1);
+  const turns=token.endsWith("2")?2:1;
+  for(let t=0;t<turns;t++){
+    for(const cubie of state){
+      const index=axis==="x"?0:axis==="y"?1:2;
+      if(cubie.p[index]!==layer)continue;
+      cubie.p=rotateVector(cubie.p,axis,base);
+      cubie.stickers=cubie.stickers.map(st=>({normal:rotateVector(st.normal,axis,base),color:st.color}));
+    }
+  }
+}
+
+function buildCubeState(size,scramble){
+  const state=buildSolvedCubeState(size);
+  const tokens=scramble.trim()?scramble.trim().split(/\s+/):[];
+  for(const token of tokens)if(/^[RLUDFB](2|')?$/.test(token))applyMove(state,token);
+  return state;
+}
+
+function cubeStateSignature(state){
+  return state.map(c=>`${c.p.join(",")}:${c.stickers.map(s=>s.normal.join(",")+s.color).sort().join("|")}`).sort().join(";");
+}
+function inverseScramble(scramble){
+  return scramble.trim().split(/\s+/).reverse().map(t=>t.endsWith("2")?t:t.endsWith("'")?t.slice(0,-1):`${t}'`).join(" ");
+}
+function auditCubeEngine(size,scramble){
+  const solved=buildSolvedCubeState(size);
+  const state=buildCubeState(size,scramble);
+  const restored=buildCubeState(size,`${scramble} ${inverseScramble(scramble)}`);
+  const ok=cubeStateSignature(restored)===cubeStateSignature(solved);
+  if(!ok)console.error("CubeClash cube-engine audit failed",{size,scramble});
+  return ok;
+}
+
+function stickerTransform(normal,d){
+  const [x,y,z]=normal;
+  if(x===1)return `rotateY(90deg) translateZ(${d}px)`;
+  if(x===-1)return `rotateY(-90deg) translateZ(${d}px)`;
+  if(y===1)return `rotateX(90deg) translateZ(${d}px)`;
+  if(y===-1)return `rotateX(-90deg) translateZ(${d}px)`;
+  if(z===1)return `translateZ(${d}px)`;
+  return `rotateY(180deg) translateZ(${d}px)`;
+}
+
 function renderCube(){
   const root=document.querySelector("#cube3d");
   if(!root)return;
-
   const size=s.puzzle==="222"?2:3;
-  // Keep the whole puzzle square and proportional. The cubie size changes,
-  // but the gap stays small so 2x2 cannot visually read as a cropped 3x3.
-  const cubie=size===2?76:54;
-  const gap=size===2?5:4;
+  const audit=auditCubeEngine(size,s.scramble);
+  root.dataset.engineAudit=audit?"pass":"fail";
+
+  // The whole puzzle is kept almost the same visual size for both puzzles.
+  // 2x2 uses larger cubies because it has only two pieces per axis.
+  const cubie=size===2?76:49;
+  const gap=size===2?4:3;
   const pitch=cubie+gap;
   const half=cubie/2;
-  const total=pitch*size-gap;
   const state=buildCubeState(size,s.scramble);
-  const colors={R:"#d71920",O:"#ff6a00",W:"#f7f7f7",Y:"#ffd500",G:"#009b48",B:"#0051ba"};
-  const normals={
-    "1,0,0":"R","-1,0,0":"L","0,1,0":"U","0,-1,0":"D","0,0,1":"F","0,0,-1":"B"
-  };
-  const faceTransforms={
-    R:"rotateY(90deg)",
-    L:"rotateY(-90deg)",
-    U:"rotateX(90deg)",
-    D:"rotateX(-90deg)",
-    F:"rotateY(0deg)",
-    B:"rotateY(180deg)"
-  };
+  const faceByColor={R:"R",O:"L",W:"U",Y:"D",G:"F",B:"B"};
+  const faces=[
+    {name:"R",normal:[1,0,0],transform:"rotateY(90deg)"},
+    {name:"L",normal:[-1,0,0],transform:"rotateY(-90deg)"},
+    {name:"U",normal:[0,1,0],transform:"rotateX(90deg)"},
+    {name:"D",normal:[0,-1,0],transform:"rotateX(-90deg)"},
+    {name:"F",normal:[0,0,1],transform:"translateZ(0)"},
+    {name:"B",normal:[0,0,-1],transform:"rotateY(180deg)"}
+  ];
 
   root.innerHTML="";
-  root.style.cssText=`position:relative;width:100%;height:100%;min-height:420px;display:grid;place-items:center;perspective:1400px;perspective-origin:50% 48%;overflow:visible;touch-action:none;user-select:none;`;
-
+  root.style.cssText=`position:relative;width:100%;height:100%;min-height:420px;display:grid;place-items:center;perspective:1100px;perspective-origin:50% 50%;overflow:hidden;touch-action:none;user-select:none;`;
   const model=document.createElement("div");
   model.className="cube-model";
-  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform-origin:center center;transform:rotateX(-28deg) rotateY(-38deg);will-change:transform;`;
+  model.style.cssText=`position:relative;width:0;height:0;transform-style:preserve-3d;transform:rotateX(-27deg) rotateY(-37deg);will-change:transform;`;
   root.appendChild(model);
 
   for(const c of state){
     const piece=document.createElement("div");
     piece.className="cubelet";
-    piece.style.cssText=`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;box-sizing:border-box;transform-style:preserve-3d;transform-origin:center center;transform:translate3d(${c.p[0]*pitch}px,${-c.p[1]*pitch}px,${c.p[2]*pitch}px);background:#111;border:2px solid #050505;border-radius:${Math.max(6,cubie*.09)}px;box-shadow:inset 0 0 0 1px #3b3b3b,inset 0 -6px 10px rgba(0,0,0,.62),0 4px 8px rgba(0,0,0,.42);`;
+    piece.style.cssText=`position:absolute;left:${-half}px;top:${-half}px;width:${cubie}px;height:${cubie}px;transform-style:preserve-3d;transform:translate3d(${c.p[0]*pitch}px,${-c.p[1]*pitch}px,${c.p[2]*pitch}px);background:#141414;border:2px solid #050505;border-radius:${Math.max(5,cubie*.085)}px;box-shadow:inset 0 0 0 1px #3d3d3d,inset 0 -5px 10px #000b,0 4px 8px #0008;`;
+    const stickers=new Map(c.stickers.map(st=>[st.normal.join(","),st.color]));
 
-    const stickerByNormal=new Map(c.stickers.map(([n,color])=>[n.join(","),color]));
-
-    for(const face of ["R","L","U","D","F","B"]){
+    for(const f of faces){
       const faceEl=document.createElement("div");
-      faceEl.style.cssText=`position:absolute;left:0;top:0;width:${cubie}px;height:${cubie}px;box-sizing:border-box;background:#121212;border:1px solid #050505;border-radius:${Math.max(5,cubie*.075)}px;backface-visibility:visible;transform-style:preserve-3d;transform:${faceTransforms[face]} translateZ(${half}px);`;
-
-      const normalKey=Object.keys(normals).find(k=>normals[k]===face);
-      const color=stickerByNormal.get(normalKey);
+      faceEl.style.cssText=`position:absolute;inset:0;width:${cubie}px;height:${cubie}px;box-sizing:border-box;background:#171717;border:1px solid #050505;border-radius:${Math.max(4,cubie*.065)}px;backface-visibility:hidden;transform:${f.transform} translateZ(${half}px);`;
+      const color=stickers.get(f.normal.join(","));
       if(color){
-        const inset=Math.max(4,cubie*.085);
+        const inset=Math.max(5,cubie*.095);
         const sticker=document.createElement("div");
-        sticker.style.cssText=`position:absolute;left:${inset}px;top:${inset}px;width:${cubie-inset*2}px;height:${cubie-inset*2}px;box-sizing:border-box;background:${colors[color]};border:2px solid rgba(0,0,0,.34);border-radius:${Math.max(4,cubie*.075)}px;box-shadow:inset 2px 2px 4px rgba(255,255,255,.24),inset -3px -3px 5px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.5);transform:translateZ(2px);`;
+        sticker.className=`sticker-face sticker-${color}`;
+        sticker.style.cssText=`position:absolute;left:${inset}px;top:${inset}px;width:${cubie-inset*2}px;height:${cubie-inset*2}px;box-sizing:border-box;background:${COLOR_HEX[color]};border:2px solid rgba(0,0,0,.38);border-radius:${Math.max(4,cubie*.065)}px;box-shadow:inset 2px 2px 4px rgba(255,255,255,.22),inset -3px -3px 5px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.55);transform:translateZ(2px);`;
         faceEl.appendChild(sticker);
       }
       piece.appendChild(faceEl);
@@ -72,22 +155,12 @@ function renderCube(){
     model.appendChild(piece);
   }
 
-  let dragging=false,sx=0,sy=0,rx=-28,ry=-38;
-  const finish=e=>{
-    dragging=false;
-    if(e?.pointerId!=null)try{root.releasePointerCapture(e.pointerId)}catch{}
-  };
-  root.onpointerdown=e=>{
-    dragging=true;sx=e.clientX;sy=e.clientY;
-    root.setPointerCapture?.(e.pointerId);root.style.cursor="grabbing";
-  };
-  root.onpointermove=e=>{
-    if(!dragging)return;
-    const dx=e.clientX-sx,dy=e.clientY-sy;
-    model.style.transform=`rotateX(${rx-dy*.35}deg) rotateY(${ry+dx*.35}deg)`;
-  };
-  root.onpointerup=e=>{finish(e);root.style.cursor="grab"};
-  root.onpointercancel=e=>{finish(e);root.style.cursor="grab"};
+  let dragging=false,sx=0,sy=0,rx=-27,ry=-37;
+  root.style.cursor="grab";
+  root.onpointerdown=e=>{dragging=true;sx=e.clientX;sy=e.clientY;root.setPointerCapture?.(e.pointerId);root.style.cursor="grabbing"};
+  root.onpointermove=e=>{if(!dragging)return;const dx=e.clientX-sx,dy=e.clientY-sy;model.style.transform=`rotateX(${rx-dy*.32}deg) rotateY(${ry+dx*.32}deg)`};
+  const end=e=>{dragging=false;root.style.cursor="grab";if(e?.pointerId!=null)try{root.releasePointerCapture(e.pointerId)}catch{}};
+  root.onpointerup=end;root.onpointercancel=end;
 }
 async function mountCube(){try{renderCube()}catch(err){console.error("CubeClash cube renderer error:",err);const h=document.querySelector("#cube3d");if(h)h.innerHTML=`<div class="cube-error"><strong>3D CUBE ERROR</strong><span>${esc(err.message||String(err))}</span></div>`}}
 async function solo(){if(!s.scramble)await scr();const a=await getSolves(),valid=a.filter(x=>x.penalty!=="DNF").map(x=>x.timeMs+(x.penalty==="+2"?2000:0));const avg=n=>valid.length>=n?fmt(valid.slice(0,n).reduce((a,b)=>a+b,0)/n):"—";v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · TOUCH TO START</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div class="stats-panel"><div class="stats-grid"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${valid.length?fmt(Math.min(...valid)):"—"}</strong></div><div class="stat-box"><small>AO5</small><strong>${avg(5)}</strong></div><div class="stat-box"><small>AO12</small><strong>${avg(12)}</strong></div></div><div class="solves-list">${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div></div>`);bindSolo()}
