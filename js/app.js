@@ -262,6 +262,21 @@ function soloStatsMarkup(a=[]){
   const averages=[5,12,50,100,1000];
   return `<div class="stats-panel"><div class="stats-section-head"><div><div class="stats-kicker">CURRENT PUZZLE</div><h2>${s.puzzle==="333"?"3×3":"2×2"} STATISTICS</h2></div><span class="stats-note">LATEST SOLVES FIRST</span></div><div class="stats-grid stats-grid-wide"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${bestSolve(a)}</strong></div>${averages.map(n=>`<div class="stat-box"><small>AO${n}</small><strong>${rollingAverage(a,n)}</strong></div>`).join("")}</div><div class="graph-panel"><div class="graph-head"><div><div class="stats-kicker">TIME TREND</div><h3>LAST 50 SOLVES</h3></div><span class="stats-note">+2 INCLUDED · DNF EXCLUDED</span></div>${buildTimeGraph(a)}</div><div class="solves-list"><div class="solve-list-head"><span>RECENT SOLVES</span><span>${a.length} TOTAL</span></div>${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span><button class="delete-solve-btn" data-delete-solve="${esc(x.id)}" title="Delete this solve" aria-label="Delete solve">DELETE</button></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div>`;
 }
+function cube(){
+  const speed=Math.max(.05,Math.min(2,Number(settings.scrambleSpeed)||1));
+  return `<div class="cube-player-wrap">
+    <div class="cube-follow-head"><span>FOLLOW THE SCRAMBLE</span><span>WHITE TOP · GREEN FRONT</span></div>
+    <div id="cube3d" aria-label="Animated Rubik's cube scramble"></div>
+    <div id="scrambleMoveLabel" class="cube-move-label">PREPARING SCRAMBLE</div>
+    <div class="scramble-speed">
+      <div class="scramble-speed-head"><span>SCRAMBLE SPEED</span><strong id="scrambleSpeedValue">${speed.toFixed(2)}×</strong></div>
+      <input id="scrambleSpeed" type="range" min="0.05" max="2" step="0.05" value="${speed}">
+      <div class="scramble-speed-scale"><span>0.05× NEWBIE</span><span>1.00× NORMAL</span><span>2.00× FAST</span></div>
+    </div>
+    <div class="cube-follow-foot"><span>WATCH EACH TURN</span><button class="ghost-btn" id="replayScramble" disabled>REPLAY SCRAMBLE</button></div>
+  </div>`;
+}
+
 function renderSoloView(a=[]){
   v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone" role="button" tabindex="0" aria-label="Solo timer"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · HOLD TO START SOLVE</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div id="soloStats">${soloStatsMarkup(a)}</div></div>`);
 }

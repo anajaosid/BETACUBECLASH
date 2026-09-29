@@ -49,3 +49,9 @@ Created and developed by **Sid Anajao**.
 - `2` turns now apply exactly two quarter-turns to the same affected layer.
 - Added internal cube-state validation and standard corner-cycle audits.
 - 3D and 2D scramble views continue to derive from the same cube state.
+
+
+## v51
+- Fixed the missing solo cube component (`cube()`), which caused the Solo Timer route to throw before rendering.
+- Restored the scramble visualization, replay button, move label, and speed control markup.
+- Bumped app/service-worker cache references to v51 so the repaired Solo screen is loaded instead of stale code.
