@@ -1,4 +1,5 @@
 import {addSolve,getSolves,deleteSolve,clearSolves,exportData,importData} from "./storage.js";
+import {bindSolveDeleteButtons} from "./solo-actions.js";
 import {MOVES,CUBE_COLORS,MOVE_AXIS,MOVE_LAYER,MOVE_SIGN,COLOR_HEX,buildSolvedCubeState,applyMove,buildCubeState,inverseScramble,auditCubeEngine} from "./cube-engine.js";
 import {wipeCubeClashData} from "./reset.js";
 import {P2PRoom} from "./p2p.js";
@@ -286,7 +287,10 @@ async function refreshSoloHistory(){
     if(!Array.isArray(all))return;
     const a=all.filter(x=>x.puzzle===s.puzzle);
     const holder=document.querySelector("#soloStats");
-    if(holder)holder.innerHTML=soloStatsMarkup(a);
+    if(holder){
+      holder.innerHTML=soloStatsMarkup(a);
+      bindSolveDeleteButtons(holder,{deleteSolve,getSolves,toast,solo,s,confirmFn:(message)=>confirm(message)});
+    }
   }catch(err){console.error("CubeClash history load failed",err)}
 }
 async function solo(){
@@ -353,7 +357,7 @@ function bindSolo(){
     localStorage.setItem("cubeclash-settings",JSON.stringify(settings));
   });
   document.querySelector("#copy").onclick=()=>navigator.clipboard?.writeText(s.scramble).then(()=>toast("SCRAMBLE COPIED"));
-  document.querySelectorAll("[data-delete-solve]").forEach(btn=>btn.addEventListener("click",async e=>{e.stopPropagation();const id=btn.dataset.deleteSolve;if(!id)return;if(!confirm("Delete this solve? This cannot be undone unless you exported it."))return;try{await deleteSolve(id);const all=await getSolves();const latest=all.find(x=>x.puzzle===s.puzzle);s.last=latest?{display:latest.display}:null;toast("SOLVE DELETED");await solo()}catch(err){console.error(err);toast("DELETE FAILED")}}));
+  bindSolveDeleteButtons(document,{deleteSolve,getSolves,toast,solo,s,confirmFn:(message)=>confirm(message)});
   let held=false,holdFired=false,timer=0;
   const canUseKeyboard=()=>{
     const ae=document.activeElement;
