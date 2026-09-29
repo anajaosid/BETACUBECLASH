@@ -188,3 +188,18 @@ body.theme-light .cube-move-label{background:#f7f7f7}
 .scramble-speed-scale strong{color:var(--text)}
 body.theme-light .scramble-speed{background:rgba(0,0,0,.025)}
 @media(max-width:520px){.scramble-speed{padding:10px 12px 9px}.scramble-speed-head{font-size:8px}.scramble-speed-scale{font-size:7px}}
+
+/* v52 timer input + solve-row layout fixes */
+.timer-zone{touch-action:none;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;overscroll-behavior:contain}
+.timer-zone:focus{outline:2px solid var(--text);outline-offset:-2px}
+.solve-row{grid-template-columns:40px minmax(0,1fr) 88px 58px 72px;align-items:center;min-width:0}
+.solve-row>span{min-width:0}
+.solve-row .solve-scramble{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text)}
+.solve-row .solve-time{white-space:nowrap;text-align:right;font-weight:700}
+.solve-row .solve-puzzle{white-space:nowrap;text-align:center}
+.delete-solve-btn{min-width:72px;justify-self:end;white-space:nowrap;flex:none}
+@media(max-width:640px){
+  .solve-row{grid-template-columns:28px minmax(0,1fr) 70px 42px 66px;gap:6px;padding:10px 0}
+  .solve-row .solve-scramble{font-size:9px}
+  .delete-solve-btn{min-width:66px;padding:6px 6px;font-size:8px}
+}

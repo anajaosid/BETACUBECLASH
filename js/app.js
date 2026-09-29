@@ -260,7 +260,7 @@ function withTimeout(promise,ms,fallback){
 }
 function soloStatsMarkup(a=[]){
   const averages=[5,12,50,100,1000];
-  return `<div class="stats-panel"><div class="stats-section-head"><div><div class="stats-kicker">CURRENT PUZZLE</div><h2>${s.puzzle==="333"?"3×3":"2×2"} STATISTICS</h2></div><span class="stats-note">LATEST SOLVES FIRST</span></div><div class="stats-grid stats-grid-wide"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${bestSolve(a)}</strong></div>${averages.map(n=>`<div class="stat-box"><small>AO${n}</small><strong>${rollingAverage(a,n)}</strong></div>`).join("")}</div><div class="graph-panel"><div class="graph-head"><div><div class="stats-kicker">TIME TREND</div><h3>LAST 50 SOLVES</h3></div><span class="stats-note">+2 INCLUDED · DNF EXCLUDED</span></div>${buildTimeGraph(a)}</div><div class="solves-list"><div class="solve-list-head"><span>RECENT SOLVES</span><span>${a.length} TOTAL</span></div>${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span>${esc(x.scramble)}</span><span>${esc(x.display)}</span><span class="muted">${x.puzzle==="333"?"3×3":"2×2"}</span><button class="delete-solve-btn" data-delete-solve="${esc(x.id)}" title="Delete this solve" aria-label="Delete solve">DELETE</button></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div>`;
+  return `<div class="stats-panel"><div class="stats-section-head"><div><div class="stats-kicker">CURRENT PUZZLE</div><h2>${s.puzzle==="333"?"3×3":"2×2"} STATISTICS</h2></div><span class="stats-note">LATEST SOLVES FIRST</span></div><div class="stats-grid stats-grid-wide"><div class="stat-box"><small>SOLVES</small><strong>${a.length}</strong></div><div class="stat-box"><small>BEST</small><strong>${bestSolve(a)}</strong></div>${averages.map(n=>`<div class="stat-box"><small>AO${n}</small><strong>${rollingAverage(a,n)}</strong></div>`).join("")}</div><div class="graph-panel"><div class="graph-head"><div><div class="stats-kicker">TIME TREND</div><h3>LAST 50 SOLVES</h3></div><span class="stats-note">+2 INCLUDED · DNF EXCLUDED</span></div>${buildTimeGraph(a)}</div><div class="solves-list"><div class="solve-list-head"><span>RECENT SOLVES</span><span>${a.length} TOTAL</span></div>${a.slice(0,12).map((x,i)=>`<div class="solve-row"><span>${a.length-i}</span><span class="solve-scramble">${esc(x.scramble)}</span><span class="solve-time">${esc(x.display)}</span><span class="muted solve-puzzle">${x.puzzle==="333"?"3×3":"2×2"}</span><button class="delete-solve-btn" data-delete-solve="${esc(x.id)}" title="Delete this solve" aria-label="Delete solve">DELETE</button></div>`).join("")||'<div class="empty">NO SOLVES YET</div>'}</div></div>`;
 }
 function cube(){
   const speed=Math.max(.05,Math.min(2,Number(settings.scrambleSpeed)||1));
@@ -278,7 +278,7 @@ function cube(){
 }
 
 function renderSoloView(a=[]){
-  v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone" role="button" tabindex="0" aria-label="Solo timer"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE / ENTER · HOLD TO START SOLVE</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div id="soloStats">${soloStatsMarkup(a)}</div></div>`);
+  v(`<div class="timer-page"><div class="timer-top"><div class="section-title" style="flex:1;margin:0"><h1>SOLO TIMER</h1><small>LOCAL SESSION</small></div><div class="room-actions"><select id="p"><option value="333" ${s.puzzle==="333"?"selected":""}>3×3</option><option value="222" ${s.puzzle==="222"?"selected":""}>2×2</option></select><button class="ghost-btn" id="new">NEW SCRAMBLE</button><button class="ghost-btn" data-view="home">BACK</button></div></div><div class="scramble-bar"><div class="scramble-text">${esc(s.scramble)}</div><button class="ghost-btn" id="copy">COPY</button></div><div class="timer-layout"><div class="timer-panel"><div class="timer-zone" id="zone" role="button" tabindex="0" aria-label="Solo timer"><div class="timer-status"><div class="timer-value" id="tv">${s.last?.display||"0.00"}</div><div class="timer-label" id="tl">READY</div><div class="timer-hint">SPACE: INSPECTION · HOLD TO START · PRESS TO FINISH</div></div></div><div class="timer-panel-footer"><div class="metric"><small>PUZZLE</small><strong>${s.puzzle==="333"?"3×3":"2×2"}</strong></div><div class="metric"><small>INSPECTION</small><strong>${settings.inspection}s</strong></div><div class="metric"><small>LAST</small><strong>${s.last?.display||"—"}</strong></div></div></div><div class="cube-panel"><div class="cube-head"><span>SCRAMBLE VISUALIZATION</span><span>3D</span></div>${cube()}</div></div><div id="soloStats">${soloStatsMarkup(a)}</div></div>`);
 }
 async function refreshSoloHistory(){
   try{
@@ -300,7 +300,44 @@ async function solo(){
     v(`<div class="empty"><strong>SOLO TIMER COULD NOT OPEN</strong><br><br><button class="primary-btn" data-view="solo">TRY AGAIN</button></div>`);
   }
 }
-function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);document.querySelector("#tl").textContent=label}function stop(){cancelAnimationFrame(s.raf)}function loop(){const n=performance.now();if(s.phase==="inspection")set(Math.max(0,settings.inspection*1000-(n-s.inspectionStart)),"INSPECTION");if(s.phase==="solving")set(n-s.solveStart,"SOLVING");s.raf=requestAnimationFrame(loop)}function press(){if(s.phase==="ready"||s.phase==="stopped"){s.phase="inspection";s.inspectionStart=performance.now();loop();return}if(s.phase==="inspection"){const e=performance.now()-s.inspectionStart;s.penalty=e>=17000?"DNF":e>=15000?"+2":"";s.phase="solving";s.solveStart=performance.now();return}if(s.phase==="solving")finish()}async function finish(){const ms=performance.now()-s.solveStart;stop();s.phase="stopped";const display=s.penalty==="DNF"?"DNF":fmt(ms+(s.penalty==="+2"?2000:0));s.last={display};await addSolve({id:crypto.randomUUID(),createdAt:Date.now(),puzzle:s.puzzle,scramble:s.scramble,timeMs:ms,penalty:s.penalty,display});toast(display);setTimeout(async()=>{s.phase="ready";await scr();solo()},300)}function bindSolo(){
+function set(ms,label){const tv=document.querySelector("#tv"),tl=document.querySelector("#tl");if(tv)tv.textContent=fmt(ms);if(tl)tl.textContent=label}
+function stop(){cancelAnimationFrame(s.raf);s.raf=0}
+function loop(){cancelAnimationFrame(s.raf);const tick=()=>{const n=performance.now();if(s.phase==="inspection"){set(Math.max(0,settings.inspection*1000-(n-s.inspectionStart)),"INSPECTION");}else if(s.phase==="solving"){set(n-s.solveStart,"SOLVING");}else{return;}s.raf=requestAnimationFrame(tick)};tick()}
+function startInspection(){
+  stop();
+  s.phase="inspection";
+  s.penalty="";
+  s.inspectionStart=performance.now();
+  set(settings.inspection*1000,"INSPECTION");
+  loop();
+}
+function startSolve(){
+  if(s.phase!=="inspection")return;
+  const elapsed=performance.now()-s.inspectionStart;
+  s.penalty=elapsed>=17000?"DNF":elapsed>=15000?"+2":"";
+  s.phase="solving";
+  s.solveStart=performance.now();
+  set(0,"SOLVING");
+}
+async function finish(){
+  if(s.phase!=="solving")return;
+  const ms=performance.now()-s.solveStart;
+  // Ignore accidental same-frame/double-event finishes such as 0.003s.
+  if(ms<100){set(ms,"SOLVING");return;}
+  stop();
+  s.phase="stopped";
+  const display=s.penalty==="DNF"?"DNF":fmt(ms+(s.penalty==="+2"?2000:0));
+  s.last={display};
+  try{
+    await addSolve({id:crypto.randomUUID(),createdAt:Date.now(),puzzle:s.puzzle,scramble:s.scramble,timeMs:ms,penalty:s.penalty,display});
+    toast(display);
+  }catch(err){
+    console.error("CubeClash save solve failed",err);
+    toast("SOLVE SAVE FAILED");
+  }
+  setTimeout(async()=>{s.phase="ready";await scr();solo()},300);
+}
+function bindSolo(){
   mountCube();
   document.querySelector("#new").onclick=async()=>{stop();s.replayScramble=null;s.phase="ready";await scr();solo()};
   document.querySelector("#p").onchange=async e=>{s.puzzle=e.target.value;stop();s.replayScramble=null;s.phase="ready";await scr();solo()};
@@ -318,37 +355,55 @@ function set(ms,label){document.querySelector("#tv").textContent=fmt(ms);documen
   document.querySelector("#copy").onclick=()=>navigator.clipboard?.writeText(s.scramble).then(()=>toast("SCRAMBLE COPIED"));
   document.querySelectorAll("[data-delete-solve]").forEach(btn=>btn.addEventListener("click",async e=>{e.stopPropagation();const id=btn.dataset.deleteSolve;if(!id)return;if(!confirm("Delete this solve? This cannot be undone unless you exported it."))return;try{await deleteSolve(id);const all=await getSolves();const latest=all.find(x=>x.puzzle===s.puzzle);s.last=latest?{display:latest.display}:null;toast("SOLVE DELETED");await solo()}catch(err){console.error(err);toast("DELETE FAILED")}}));
   let held=false,holdFired=false,timer=0;
+  const canUseKeyboard=()=>{
+    const ae=document.activeElement;
+    return !(ae && (ae.tagName==="INPUT"||ae.tagName==="SELECT"||ae.tagName==="TEXTAREA"||ae.isContentEditable));
+  };
   const beginHold=()=>{
-    if(s.phase!=="inspection")return;
+    if(s.phase!=="inspection"||held)return;
     held=true;holdFired=false;clearTimeout(timer);
+    set(Math.max(0,settings.inspection*1000-(performance.now()-s.inspectionStart)),"HOLD SPACE / ENTER");
     timer=setTimeout(()=>{
-      if(s.phase==="inspection"&&held){holdFired=true;set(0,"RELEASE TO START SOLVE");}
+      if(s.phase==="inspection"&&held){
+        holdFired=true;
+        startSolve();
+      }
     },650);
   };
   const releaseHold=()=>{
-    clearTimeout(timer);
-    const shouldStart=held&&holdFired&&s.phase==="inspection";
+    clearTimeout(timer);timer=0;
+    const started=holdFired;
     held=false;holdFired=false;
-    if(shouldStart){
-      s.penalty="";s.phase="solving";s.solveStart=performance.now();set(0,"SOLVING");loop();
-    }else if(s.phase==="inspection")toast("HOLD SPACE TO START SOLVE");
+    // A completed long press has already entered SOLVING. Releasing must NOT stop it.
+    if(!started&&s.phase==="inspection")toast("HOLD SPACE TO START SOLVE");
   };
   const zone=document.querySelector("#zone");
-  zone.onpointerdown=e=>{e.preventDefault();if(s.phase==="ready"||s.phase==="stopped"){press();return}if(s.phase==="inspection")beginHold()};
-  zone.onpointerup=e=>{e.preventDefault();if(s.phase==="inspection")releaseHold();else if(s.phase==="solving")press()};
-  zone.onpointercancel=()=>{if(s.phase==="inspection")releaseHold()};
+  zone.onpointerdown=e=>{
+    e.preventDefault();
+    if(s.phase==="ready"||s.phase==="stopped"){startInspection();return;}
+    if(s.phase==="inspection")beginHold();
+    else if(s.phase==="solving")finish();
+  };
+  zone.onpointerup=e=>{
+    e.preventDefault();
+    if(s.phase==="inspection")releaseHold();
+  };
+  zone.onpointercancel=()=>{if(s.phase==="inspection")releaseHold();};
   const keyDown=e=>{
     if(e.code!=="Space"&&e.code!=="Enter")return;
+    if(!canUseKeyboard())return;
     e.preventDefault();
     if(e.repeat)return;
-    if(s.phase==="ready"||s.phase==="stopped"){press();return;}
-    if(s.phase==="inspection")beginHold();
+    if(s.phase==="ready"||s.phase==="stopped"){startInspection();return;}
+    if(s.phase==="inspection"){beginHold();return;}
+    if(s.phase==="solving"){finish();return;}
   };
   const keyUp=e=>{
     if(e.code!=="Space"&&e.code!=="Enter")return;
+    if(!canUseKeyboard())return;
     e.preventDefault();
-    if(s.phase==="solving"){press();return;}
     if(s.phase==="inspection")releaseHold();
+    // When solving, keyup is intentionally ignored. The next keydown is the stop action.
   };
   document.addEventListener("keydown",keyDown,true);document.addEventListener("keyup",keyUp,true);
   window._cubeClashSoloKeyHandler=keyDown;window._cubeClashSoloKeyUpHandler=keyUp;
